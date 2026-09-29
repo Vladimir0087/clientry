@@ -34,7 +34,6 @@ Thumbs.db
 # hidden until the live demo is ready
 README.md
 docs/PLAN.md
+docs/FLOW.md
 CLAUDE.md
-
-# claude
-.claude/settings.local.json
+.claude/
