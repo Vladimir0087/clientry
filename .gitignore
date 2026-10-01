@@ -32,7 +32,7 @@ Thumbs.db
 !.vscode/settings.json
 
 # hidden until the live demo is ready
-README.md
+/README.md
 docs/PLAN.md
 docs/FLOW.md
 CLAUDE.md
