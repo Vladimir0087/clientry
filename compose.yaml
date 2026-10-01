@@ -1,0 +1,37 @@
+name: clientry
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-clientry}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clientry}
+      POSTGRES_DB: ${POSTGRES_DB:-clientry}
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/<major>,
+      # not /var/lib/postgresql/data.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # -h forces TCP: during first init the entrypoint runs a socket-only temporary server
+      # that pg_isready would otherwise report as ready.
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8.1
+    # No RDB snapshots or AOF, like the hosted free instance.
+    command: [valkey-server, --save, '', --appendonly, 'no']
+    ports:
+      - 127.0.0.1:${VALKEY_PORT:-6379}:6379
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
