@@ -1,0 +1,10 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/infra/prisma/generated"
+  moduleFormat           = "esm"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}

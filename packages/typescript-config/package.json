@@ -4,6 +4,7 @@
   "private": true,
   "exports": {
     "./base.json": "./base.json",
-    "./library.json": "./library.json"
+    "./library.json": "./library.json",
+    "./nest.json": "./nest.json"
   }
 }
