@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./base": "./base.js"
+    "./base": "./base.js",
+    "./nest": "./nest.js"
   },
   "dependencies": {
     "@eslint/js": "10.0.1",

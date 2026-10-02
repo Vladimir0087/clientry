@@ -37,3 +37,6 @@ docs/PLAN.md
 docs/FLOW.md
 CLAUDE.md
 .claude/
+
+# generated
+apps/api/src/infra/prisma/generated/
