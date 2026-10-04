@@ -14,21 +14,23 @@ export interface ProblemExample {
   readonly errors?: ApiProblem['errors'];
 }
 
+// One status can answer with several codes; each becomes a named example.
 export function ApiProblemResponse(
   status: number,
-  example: ProblemExample,
+  ...examples: readonly [ProblemExample, ...ProblemExample[]]
 ): MethodDecorator & ClassDecorator {
-  const body: ApiProblem = {
+  const title = problemTitle(status);
+  const bodies = examples.map((example): ApiProblem => ({
     type: PROBLEM_TYPE,
-    title: problemTitle(status),
+    title,
     status,
     requestId: EXAMPLE_REQUEST_ID,
     ...example,
-  };
-  return ApiResponse({
-    status,
-    description: body.title,
-    standardSchema: apiProblemSchema,
-    example: body,
-  });
+  }));
+  const common = { status, description: title, standardSchema: apiProblemSchema };
+  if (bodies.length === 1) {
+    return ApiResponse({ ...common, example: bodies[0] });
+  }
+  const named = bodies.map((body) => [body.code, { summary: body.code, value: body }] as const);
+  return ApiResponse({ ...common, examples: Object.fromEntries(named) });
 }

@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { Body, Controller, Get, HttpStatus, Post } from '@nestjs/common';
 import { z } from 'zod';
 
+import { Public } from '../../src/common/auth/public.decorator.js';
 import { ApiProblemResponse } from '../../src/common/http/api-problem-response.decorator.js';
 import { ResponseSchema } from '../../src/common/http/response-schema.decorator.js';
 import { PrismaService } from '../../src/infra/prisma/prisma.service.js';
@@ -30,6 +31,7 @@ const STORED_USERS = [
   { id: 'user-2', passwordHash: 'argon2id$secret-2' },
 ];
 
+@Public()
 @Controller('test')
 export class TestOnlyController {
   private readonly slowRequestEntered = Promise.withResolvers<undefined>();

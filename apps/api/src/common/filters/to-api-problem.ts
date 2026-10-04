@@ -8,6 +8,7 @@ import { ForbiddenError } from '../errors/forbidden.error.js';
 import { NotFoundError } from '../errors/not-found.error.js';
 import { RequestValidationError } from '../errors/request-validation.error.js';
 import { ServiceUnavailableError } from '../errors/service-unavailable.error.js';
+import { UnauthenticatedError } from '../errors/unauthenticated.error.js';
 import { PROBLEM_TYPE, problemTitle } from '../http/problem-details.js';
 
 export interface ProblemContext {
@@ -25,6 +26,7 @@ type DomainErrorKind = abstract new (...args: never[]) => DomainError;
 
 const DOMAIN_ERROR_STATUSES: readonly (readonly [DomainErrorKind, HttpStatus])[] = [
   [RequestValidationError, HttpStatus.BAD_REQUEST],
+  [UnauthenticatedError, HttpStatus.UNAUTHORIZED],
   [ForbiddenError, HttpStatus.FORBIDDEN],
   [NotFoundError, HttpStatus.NOT_FOUND],
   [ConflictError, HttpStatus.CONFLICT],

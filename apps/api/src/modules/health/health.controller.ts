@@ -5,10 +5,12 @@ import { livenessResponseSchema, readinessResponseSchema } from '@clientry/share
 import type { LivenessResponse, ReadinessResponse } from '@clientry/shared/health';
 
 import { HealthService } from './health.service.js';
+import { Public } from '../../common/auth/public.decorator.js';
 import { ResponseSchema } from '../../common/http/response-schema.decorator.js';
 
 // Probes are infrastructure: the proxy does not forward /health, so they stay out of Swagger.
 @ApiExcludeController()
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(private readonly health: HealthService) {}

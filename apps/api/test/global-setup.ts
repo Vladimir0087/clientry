@@ -6,10 +6,13 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { ValkeyContainer } from '@testcontainers/valkey';
 import type { TestProject } from 'vitest/node';
 
+import { generateSigningKeyPem } from './support/test-env.js';
+
 declare module 'vitest' {
   export interface ProvidedContext {
     databaseUrl: string;
     redisUrl: string;
+    jwtPrivateKey: string;
   }
 }
 
@@ -52,6 +55,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
 
   project.provide('databaseUrl', databaseUrl);
   project.provide('redisUrl', valkey.getConnectionUrl());
+  project.provide('jwtPrivateKey', generateSigningKeyPem());
 
   return async () => {
     await Promise.all([postgres.stop(), valkey.stop()]);

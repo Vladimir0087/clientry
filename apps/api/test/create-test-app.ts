@@ -1,12 +1,14 @@
 import type { ModuleMetadata } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { agent } from 'supertest';
 import type { Agent } from 'supertest';
 import { inject } from 'vitest';
 
 import { AppModule } from '../src/app.module.js';
 import { createApp } from '../src/configure-app.js';
+import { TRUSTED_ORIGIN } from './support/test-env.js';
 import { loadConfig } from '../src/infra/config/app-config.js';
 import type { AppConfig } from '../src/infra/config/app-config.js';
 import { createLogger } from '../src/infra/logger/create-logger.js';
@@ -18,6 +20,9 @@ export interface TestAppOverrides {
   readonly databaseUrl?: string;
   readonly redisUrl?: string;
   readonly imports?: ModuleMetadata['imports'];
+  readonly trustProxyHops?: number;
+  // Off by default: fixtures register and log in far more often than the limits allow.
+  readonly isRateLimited?: boolean;
 }
 
 export interface TestApp {
@@ -31,17 +36,24 @@ export function createTestConfig(overrides: TestAppOverrides = {}): AppConfig {
     LOG_LEVEL: 'silent',
     DATABASE_URL: overrides.databaseUrl ?? inject('databaseUrl'),
     REDIS_URL: overrides.redisUrl ?? inject('redisUrl'),
+    JWT_PRIVATE_KEY: inject('jwtPrivateKey'),
+    TRUSTED_ORIGINS: `${TRUSTED_ORIGIN},http://localhost:4000`,
+    TRUST_PROXY_HOPS: String(overrides.trustProxyHops ?? 0),
   });
 }
 
 export async function createTestApp(overrides: TestAppOverrides = {}): Promise<TestApp> {
   const config = createTestConfig(overrides);
-  const moduleRef = await Test.createTestingModule({
+  const builder = Test.createTestingModule({
     imports: [
       AppModule.forRoot({ config, logger: createLogger(config) }),
       ...(overrides.imports ?? []),
     ],
-  }).compile();
+  });
+  if (overrides.isRateLimited !== true) {
+    builder.overrideGuard(ThrottlerGuard).useValue({ canActivate: () => true });
+  }
+  const moduleRef = await builder.compile();
   const app = await createApp((adapter, options) =>
     moduleRef.createNestApplication<NestExpressApplication>(adapter, options),
   );
