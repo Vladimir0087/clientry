@@ -14,6 +14,7 @@ import { ForbiddenError } from '../errors/forbidden.error.js';
 import { NotFoundError } from '../errors/not-found.error.js';
 import { RequestValidationError } from '../errors/request-validation.error.js';
 import { ServiceUnavailableError } from '../errors/service-unavailable.error.js';
+import { UnauthenticatedError } from '../errors/unauthenticated.error.js';
 
 const CONTEXT = { method: 'GET', instance: '/api/clients', requestId: 'req-1' };
 
@@ -41,6 +42,12 @@ class DependencyDownError extends ServiceUnavailableError {
   }
 }
 
+class SignInRequiredError extends UnauthenticatedError {
+  constructor() {
+    super('SIGN_IN_REQUIRED', 'Sign in first');
+  }
+}
+
 class UnmappedError extends DomainError {
   constructor() {
     super('UNMAPPED', 'internal detail');
@@ -53,6 +60,7 @@ function httpError(status: number, isExposed: boolean): Error {
 
 describe('toApiProblem', () => {
   it.each([
+    [new SignInRequiredError(), 401, 'SIGN_IN_REQUIRED'],
     [new ClientNotFoundError(), 404, 'CLIENT_NOT_FOUND'],
     [new NotAllowedError(), 403, 'NOT_ALLOWED'],
     [new DuplicateEmailError(), 409, 'DUPLICATE_EMAIL'],

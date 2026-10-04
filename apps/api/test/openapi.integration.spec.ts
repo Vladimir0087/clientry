@@ -114,6 +114,93 @@ describe('OpenAPI document', () => {
     });
   });
 
+  describe('auth operations', () => {
+    const AUTH_OPERATIONS = [
+      ['post', '/api/auth/register'],
+      ['post', '/api/auth/login'],
+      ['post', '/api/auth/refresh'],
+      ['post', '/api/auth/logout'],
+      ['get', '/api/auth/me'],
+    ] as const;
+
+    interface Operation {
+      readonly security?: unknown;
+      readonly responses?: Record<string, { content?: Record<string, { schema?: unknown }> }>;
+    }
+
+    function operation(method: string, path: string): Operation | undefined {
+      const paths = document.paths as Record<string, Record<string, Operation> | undefined>;
+      return paths[path]?.[method];
+    }
+
+    it.each(AUTH_OPERATIONS)('should document %s %s when the document is built', (method, path) => {
+      expect(operation(method, path)).toBeDefined();
+    });
+
+    it('should require the access cookie only on me when auth security is documented', () => {
+      const security = AUTH_OPERATIONS.map(([method, path]) => operation(method, path)?.security);
+
+      expect(security).toEqual([[], [], [], [], [{ accessCookie: [] }]]);
+      expect(document).toMatchObject({
+        components: {
+          securitySchemes: {
+            accessCookie: { type: 'apiKey', in: 'cookie', name: 'clientry_access' },
+          },
+        },
+      });
+    });
+
+    it.each(['RegisterRequest', 'LoginRequest'])(
+      'should describe the email with its format and length when %s is documented',
+      (name) => {
+        expect(document).toMatchObject({
+          components: {
+            schemas: {
+              [name]: { properties: { email: { format: 'email', maxLength: 254 } } },
+            },
+          },
+        });
+      },
+    );
+
+    it('should list both 403 codes of login when one status has two causes', () => {
+      expect(document).toMatchObject({
+        paths: {
+          '/api/auth/login': {
+            post: {
+              responses: {
+                '403': {
+                  content: {
+                    'application/problem+json': {
+                      examples: {
+                        UNTRUSTED_ORIGIN: { value: { code: 'UNTRUSTED_ORIGIN' } },
+                        NO_WORKSPACE: { value: { code: 'NO_WORKSPACE' } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    it.each(AUTH_OPERATIONS)(
+      'should reference ApiProblem in every error response when %s %s is documented',
+      (method, path) => {
+        const errors = Object.entries(operation(method, path)?.responses ?? {}).filter(
+          ([status]) => Number(status) >= 400,
+        );
+
+        expect(errors.length).toBeGreaterThan(0);
+        for (const [, response] of errors) {
+          expect(response.content?.['application/problem+json']?.schema).toEqual(PROBLEM_REF);
+        }
+      },
+    );
+  });
+
   it('should leave health probes out when the document is built', () => {
     const paths = Object.keys(document.paths as Record<string, unknown>);
 

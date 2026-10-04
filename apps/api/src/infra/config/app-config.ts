@@ -1,3 +1,5 @@
+import type { KeyObject } from 'node:crypto';
+
 import { envSchema } from './env.schema.js';
 import type { Env } from './env.schema.js';
 import { InvalidConfigError } from './invalid-config.error.js';
@@ -11,6 +13,10 @@ export class AppConfig {
   readonly logLevel: LogLevel;
   readonly databaseUrl: string;
   readonly redisUrl: string;
+  readonly jwtPrivateKey: KeyObject;
+  readonly jwtPublicKey: KeyObject;
+  readonly trustedOrigins: readonly string[];
+  readonly trustProxyHops: number;
 
   constructor(env: Env) {
     this.nodeEnv = env.NODE_ENV;
@@ -18,6 +24,10 @@ export class AppConfig {
     this.logLevel = env.LOG_LEVEL;
     this.databaseUrl = env.DATABASE_URL;
     this.redisUrl = env.REDIS_URL;
+    this.jwtPrivateKey = env.JWT_PRIVATE_KEY.privateKey;
+    this.jwtPublicKey = env.JWT_PRIVATE_KEY.publicKey;
+    this.trustedOrigins = env.TRUSTED_ORIGINS;
+    this.trustProxyHops = env.TRUST_PROXY_HOPS;
     Object.freeze(this);
   }
 }

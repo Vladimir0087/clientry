@@ -12,7 +12,8 @@ export default defineConfig(
   },
   {
     files: ['src/**/*.ts'],
-    ignores: ['src/infra/prisma/**', 'src/**/*.repository.ts'],
+    // Integration tests assert on stored rows, so they read the database directly.
+    ignores: ['src/infra/prisma/**', 'src/**/*.repository.ts', 'src/**/*.integration.spec.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
