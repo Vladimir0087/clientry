@@ -40,3 +40,4 @@ CLAUDE.md
 
 # generated
 apps/api/src/infra/prisma/generated/
+next-env.d.ts

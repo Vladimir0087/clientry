@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { parseOrigin, parseSigningKey } from './env-parsers.js';
+import { parseOrigin } from '@clientry/shared/common';
+
+import { parseSigningKey } from './env-parsers.js';
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 const NON_EMPTY = /^.+$/;

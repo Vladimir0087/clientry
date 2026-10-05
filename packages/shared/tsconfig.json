@@ -1,5 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@clientry/typescript-config/library.json",
+  "compilerOptions": {
+    // Consumed by the browser and by Node; dom declares the WHATWG globals both have, such as URL.
+    "lib": ["es2025", "dom"]
+  },
   "include": ["src", "vitest.config.ts"]
 }

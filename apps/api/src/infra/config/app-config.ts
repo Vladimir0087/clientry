@@ -1,8 +1,9 @@
 import type { KeyObject } from 'node:crypto';
 
+import { InvalidConfigError } from '@clientry/shared/common';
+
 import { envSchema } from './env.schema.js';
 import type { Env } from './env.schema.js';
-import { InvalidConfigError } from './invalid-config.error.js';
 
 type NodeEnv = Env['NODE_ENV'];
 type LogLevel = Env['LOG_LEVEL'];
@@ -37,10 +38,5 @@ export function loadConfig(source: Readonly<Record<string, string | undefined>>)
   if (result.success) {
     return new AppConfig(result.data);
   }
-  // Built from paths and zod messages only: an issue's input may be a secret.
-  const issues = result.error.issues.map((issue) => ({
-    variable: issue.path.map(String).join('.'),
-    reason: issue.message,
-  }));
-  throw new InvalidConfigError(issues);
+  throw InvalidConfigError.fromZodError(result.error);
 }

@@ -75,7 +75,7 @@ export class AuthController {
     code: 'VALIDATION_FAILED',
     detail: 'Request validation failed',
     instance: '/api/auth/register',
-    errors: [{ path: 'password', message: 'Too small: expected string to have >=12 characters' }],
+    errors: [{ path: 'password', message: 'Use at least 12 characters' }],
   })
   @ApiUntrustedOrigin('/api/auth/register')
   @ApiErrorResponse(HttpStatus.CONFLICT, '/api/auth/register', new EmailTakenError())
@@ -95,7 +95,7 @@ export class AuthController {
     code: 'VALIDATION_FAILED',
     detail: 'Request validation failed',
     instance: '/api/auth/login',
-    errors: [{ path: 'email', message: 'Invalid email address' }],
+    errors: [{ path: 'email', message: 'Enter a valid email' }],
   })
   @ApiErrorResponse(HttpStatus.UNAUTHORIZED, '/api/auth/login', new InvalidCredentialsError())
   @ApiErrorResponse(
@@ -127,7 +127,7 @@ export class AuthController {
     try {
       return this.respond(response, await this.auth.refresh(refreshToken));
     } catch (error) {
-      // The browser stops presenting a dead token, and the web middleware sees a signed-out user.
+      // The browser stops presenting a dead token, and the web proxy sees a signed-out user.
       if (error instanceof InvalidRefreshTokenError) {
         this.cookies.clear(response);
       }
@@ -162,7 +162,11 @@ export class AuthController {
   }
 
   private respond(response: Response, issued: IssuedSession): SessionResponse {
-    this.cookies.set(response, issued);
+    this.cookies.set(response, {
+      accessToken: issued.accessToken,
+      refreshToken: issued.refreshToken,
+      maxAgeMs: issued.refreshMaxAgeMs,
+    });
     return issued.session;
   }
 }

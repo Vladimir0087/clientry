@@ -61,6 +61,16 @@ describe('refresh API', () => {
     expect(cookies.get(REFRESH_TOKEN_COOKIE)?.value).not.toBe(refreshToken);
   });
 
+  it('should give the access cookie the Max-Age of the refresh cookie when the token is fresh', async () => {
+    const { refreshToken } = await registerAccount(testApp);
+
+    const cookies = setCookies(await refresh(refreshToken));
+
+    expect(cookies.get(ACCESS_TOKEN_COOKIE)?.attributes['max-age']).toBe(
+      cookies.get(REFRESH_TOKEN_COOKIE)?.attributes['max-age'],
+    );
+  });
+
   it('should answer 200 when the previous token is replayed at once', async () => {
     const { refreshToken } = await registerAccount(testApp);
     await refresh(refreshToken).expect(200);

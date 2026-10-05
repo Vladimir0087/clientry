@@ -76,7 +76,7 @@ describe('auth API', () => {
       const cookies = setCookies(await register());
 
       expect(cookies.get(ACCESS_TOKEN_COOKIE)?.attributes).toEqual({
-        'max-age': '900',
+        'max-age': '1209600',
         path: '/',
         expires: expect.any(String) as string,
         httponly: true,
@@ -179,6 +179,19 @@ describe('auth API', () => {
         REFRESH_TOKEN_COOKIE,
       ]);
       expect(await prisma.session.count()).toBe(2);
+    });
+
+    it('should give the access cookie the Max-Age of the refresh cookie when credentials match', async () => {
+      await register();
+
+      const response = await send()
+        .post('/api/auth/login')
+        .send({ email: REGISTRATION.email, password: TEST_PASSWORD });
+      const cookies = setCookies(response);
+
+      expect(cookies.get(ACCESS_TOKEN_COOKIE)?.attributes['max-age']).toBe(
+        cookies.get(REFRESH_TOKEN_COOKIE)?.attributes['max-age'],
+      );
     });
 
     it('should answer the same 401 when the password is wrong or the email unknown', async () => {

@@ -15,6 +15,12 @@ function failedPaths(result: {
   return (result.error?.issues ?? []).map((issue) => issue.path.map(String).join('.'));
 }
 
+function messagesOf(result: {
+  readonly error?: { readonly issues: readonly { message: string }[] };
+}): string[] {
+  return (result.error?.issues ?? []).map(({ message }) => message);
+}
+
 describe('registerRequestSchema', () => {
   it('should trim and lowercase the email when it has spaces and capitals', () => {
     const result = registerRequestSchema.parse({
@@ -64,6 +70,51 @@ describe('registerRequestSchema', () => {
 
     expect(result.password).toBe(password);
   });
+
+  it('should read "Enter your email" when the email is empty', () => {
+    const result = registerRequestSchema.safeParse({ ...VALID_REGISTRATION, email: '' });
+
+    expect(messagesOf(result)).toEqual(['Enter your email']);
+  });
+
+  it('should read "Enter a valid email" when the email is not an address', () => {
+    const result = registerRequestSchema.safeParse({ ...VALID_REGISTRATION, email: 'ann@' });
+
+    expect(messagesOf(result)).toEqual(['Enter a valid email']);
+  });
+
+  it('should read "Use at least 12 characters" when the password has 11 characters', () => {
+    const result = registerRequestSchema.safeParse({
+      ...VALID_REGISTRATION,
+      password: 'p'.repeat(11),
+    });
+
+    expect(messagesOf(result)).toEqual(['Use at least 12 characters']);
+  });
+
+  it('should read only "Enter your password" when the password is empty', () => {
+    const result = registerRequestSchema.safeParse({ ...VALID_REGISTRATION, password: '' });
+
+    expect(messagesOf(result)).toEqual(['Enter your password']);
+  });
+
+  it('should read "Use at most 128 characters" when the password is too long', () => {
+    const result = registerRequestSchema.safeParse({
+      ...VALID_REGISTRATION,
+      password: 'p'.repeat(129),
+    });
+
+    expect(messagesOf(result)).toEqual(['Use at most 128 characters']);
+  });
+
+  it.each([
+    ['name', 'Enter your name'],
+    ['workspaceName', 'Enter a workspace name'],
+  ])('should read the empty message when %s is blank', (field, message) => {
+    const result = registerRequestSchema.safeParse({ ...VALID_REGISTRATION, [field]: '   ' });
+
+    expect(messagesOf(result)).toEqual([message]);
+  });
 });
 
 describe('loginRequestSchema', () => {
@@ -73,9 +124,10 @@ describe('loginRequestSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('should reject the password when it is empty', () => {
+  it('should reject the password with "Enter your password" when it is empty', () => {
     const result = loginRequestSchema.safeParse({ email: 'ann@studio.dev', password: '' });
 
     expect(failedPaths(result)).toEqual(['password']);
+    expect(messagesOf(result)).toEqual(['Enter your password']);
   });
 });

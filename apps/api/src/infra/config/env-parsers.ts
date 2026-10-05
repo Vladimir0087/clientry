@@ -7,7 +7,6 @@ export interface SigningKeys {
 }
 
 const P256_CURVE = 'prime256v1';
-const HTTP_PROTOCOLS = new Set(['http:', 'https:']);
 
 // Hosting panels that take one line get the PEM with literal \n sequences.
 export function parseSigningKey(value: string): SigningKeys | undefined {
@@ -21,21 +20,4 @@ export function parseSigningKey(value: string): SigningKeys | undefined {
     privateKey.asymmetricKeyType === 'ec' &&
     privateKey.asymmetricKeyDetails?.namedCurve === P256_CURVE;
   return isP256 ? { privateKey, publicKey: createPublicKey(privateKey) } : undefined;
-}
-
-export function parseOrigin(entry: string): string | undefined {
-  if (!URL.canParse(entry)) {
-    return undefined;
-  }
-  const url = new URL(entry);
-  const isBareOrigin =
-    HTTP_PROTOCOLS.has(url.protocol) &&
-    url.pathname === '/' &&
-    url.search === '' &&
-    url.hash === '' &&
-    url.username === '' &&
-    url.password === '' &&
-    !entry.endsWith('?') &&
-    !entry.endsWith('#');
-  return isBareOrigin ? url.origin : undefined;
 }

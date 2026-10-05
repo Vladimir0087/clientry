@@ -9,6 +9,7 @@ allowBuilds:
   '@scarf/scarf': false
   '@swc/core': true
   cpu-features: false
+  msw: false
   prisma: true
   protobufjs: false
   ssh2: false

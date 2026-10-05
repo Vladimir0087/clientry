@@ -3,7 +3,6 @@ import type { CookieOptions, Request, Response } from 'express';
 
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '@clientry/shared/auth';
 
-import { ACCESS_TOKEN_TTL_SECONDS } from './access-token.service.js';
 import { AppConfig } from '../../infra/config/app-config.js';
 
 const REFRESH_COOKIE_PATH = '/api/auth';
@@ -11,7 +10,7 @@ const REFRESH_COOKIE_PATH = '/api/auth';
 export interface SessionCookies {
   readonly accessToken: string;
   readonly refreshToken: string;
-  readonly refreshMaxAgeMs: number;
+  readonly maxAgeMs: number;
 }
 
 function readCookie(request: Request, name: string): string | undefined {
@@ -45,14 +44,15 @@ export class AuthCookies {
     return readCookie(request, REFRESH_TOKEN_COOKIE);
   }
 
+  // The access cookie outlives its JWT, so the web proxy can tell an expired session from none.
   set(response: Response, cookies: SessionCookies): void {
     response.cookie(ACCESS_TOKEN_COOKIE, cookies.accessToken, {
       ...this.accessOptions,
-      maxAge: ACCESS_TOKEN_TTL_SECONDS * 1000,
+      maxAge: cookies.maxAgeMs,
     });
     response.cookie(REFRESH_TOKEN_COOKIE, cookies.refreshToken, {
       ...this.refreshOptions,
-      maxAge: cookies.refreshMaxAgeMs,
+      maxAge: cookies.maxAgeMs,
     });
   }
 
