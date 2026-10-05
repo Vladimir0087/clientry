@@ -2,8 +2,9 @@ import { generateKeyPairSync } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
+import { InvalidConfigError } from '@clientry/shared/common';
+
 import { loadConfig } from './app-config.js';
-import { InvalidConfigError } from './invalid-config.error.js';
 import { generateSigningKeyPem } from '../../../test/support/test-env.js';
 
 const DATABASE_URL = 'postgresql://clientry:s3cret-db@127.0.0.1:5432/clientry';

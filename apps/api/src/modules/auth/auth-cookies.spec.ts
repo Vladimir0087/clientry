@@ -28,7 +28,7 @@ describe('AuthCookies', () => {
       cookies.set(response, {
         accessToken: 'access',
         refreshToken: 'refresh',
-        refreshMaxAgeMs: REFRESH_MAX_AGE_MS,
+        maxAgeMs: REFRESH_MAX_AGE_MS,
       });
     });
 
@@ -36,7 +36,13 @@ describe('AuthCookies', () => {
       {
         name: ACCESS_TOKEN_COOKIE,
         value: 'access',
-        options: { path: '/', sameSite: 'lax', httpOnly: true, secure: false, maxAge: 900_000 },
+        options: {
+          path: '/',
+          sameSite: 'lax',
+          httpOnly: true,
+          secure: false,
+          maxAge: REFRESH_MAX_AGE_MS,
+        },
       },
       {
         name: REFRESH_TOKEN_COOKIE,
@@ -52,11 +58,21 @@ describe('AuthCookies', () => {
     ]);
   });
 
+  it('should give the access cookie the refresh Max-Age when the session end caps it', () => {
+    const cookies = new AuthCookies(createUnitConfig());
+
+    const calls = captureCookies((response) => {
+      cookies.set(response, { accessToken: 'a', refreshToken: 'r', maxAgeMs: 5000 });
+    });
+
+    expect(calls.map(({ options }) => options.maxAge)).toEqual([5000, 5000]);
+  });
+
   it('should mark both cookies secure when NODE_ENV is production', () => {
     const cookies = new AuthCookies(createUnitConfig({ NODE_ENV: 'production' }));
 
     const calls = captureCookies((response) => {
-      cookies.set(response, { accessToken: 'a', refreshToken: 'r', refreshMaxAgeMs: 1000 });
+      cookies.set(response, { accessToken: 'a', refreshToken: 'r', maxAgeMs: 1000 });
     });
 
     expect(calls.map(({ options }) => options.secure)).toEqual([true, true]);
