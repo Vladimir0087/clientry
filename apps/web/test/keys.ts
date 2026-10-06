@@ -9,7 +9,11 @@ export interface TestKeyPair {
 
 function createKeyPair(): TestKeyPair {
   const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
-  return { publicKey, privateKey, publicPem: publicKey.export({ format: 'pem', type: 'spki' }) };
+  return {
+    publicKey,
+    privateKey,
+    publicPem: publicKey.export({ format: 'pem', type: 'spki' }).toString(),
+  };
 }
 
 // The web trusts SIGNING_KEYS through JWT_PUBLIC_KEY; FOREIGN_KEYS stand for anyone else.

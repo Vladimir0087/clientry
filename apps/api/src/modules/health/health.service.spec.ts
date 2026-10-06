@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotReadyError } from './errors.js';
 import type { HealthRepository } from './health.repository.js';
 import { CHECK_TIMEOUT_MS, HealthService } from './health.service.js';
+import { createUnitConfig } from '../../../test/support/unit-config.js';
 import type { RedisService } from '../../infra/redis/redis.service.js';
 
 interface Probes {
@@ -18,11 +19,17 @@ const HANGING = (): Promise<void> =>
     // never settles
   });
 
+const APP_VERSION = '0123abc';
+
 function createService({ database, redis }: Probes): HealthService {
   const repository: HealthRepository = { pingDatabase: vi.fn(database) };
   // satisfies keeps the mock in step with RedisService; the cast only drops its private fields.
   const redisService = { ping: vi.fn(redis) } satisfies Pick<RedisService, 'ping'>;
-  return new HealthService(repository, redisService as unknown as RedisService);
+  return new HealthService(
+    repository,
+    redisService as unknown as RedisService,
+    createUnitConfig({ APP_VERSION }),
+  );
 }
 
 async function captureNotReady(promise: Promise<unknown>): Promise<NotReadyError> {
@@ -47,10 +54,10 @@ describe('HealthService', () => {
     vi.restoreAllMocks();
   });
 
-  it('should report ok when the process is alive', () => {
+  it('should report ok with the configured version when the process is alive', () => {
     const service = createService({ database: UP, redis: UP });
 
-    expect(service.getLiveness()).toEqual({ status: 'ok' });
+    expect(service.getLiveness()).toEqual({ status: 'ok', version: APP_VERSION });
   });
 
   it('should report ok when both dependencies are up', async () => {

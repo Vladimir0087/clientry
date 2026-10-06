@@ -33,5 +33,43 @@ services:
       timeout: 5s
       retries: 10
 
+  # The image that ships to Render, against the services above: pnpm infra:full.
+  api:
+    profiles: [full]
+    image: clientry-api:local
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    platform: linux/amd64
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-clientry}:${POSTGRES_PASSWORD:-clientry}@postgres:5432/${POSTGRES_DB:-clientry}
+      REDIS_URL: redis://valkey:6379
+      # Not ${JWT_PRIVATE_KEY:?}: Compose interpolates inactive profiles too, and infra:up runs
+      # without a key. An empty one stops the container with the API's own config error.
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      TRUSTED_ORIGINS: http://localhost:3000
+      TRUST_PROXY_HOPS: 0
+    ports:
+      - 127.0.0.1:4000:4000
+    # Above the API's own 10 s shutdown deadline.
+    stop_grace_period: 15s
+    healthcheck:
+      # The slim image has no curl.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/health/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
 volumes:
   postgres-data:

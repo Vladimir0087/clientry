@@ -44,7 +44,10 @@ try {
   app.enableShutdownHooks([...SHUTDOWN_SIGNALS], { useProcessExit: true });
   registerShutdownDeadline(process, logger);
   await app.listen(config.port);
-  new Logger('Bootstrap').log(`API listening on port ${String(config.port)}`);
+  new Logger('Bootstrap').log(
+    { version: config.appVersion },
+    `API listening on port ${String(config.port)}`,
+  );
 } catch (error) {
   logger.fatal({ err: error }, 'API failed to start');
   process.exit(1);

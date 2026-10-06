@@ -14,8 +14,8 @@ function keyPair(options: KeyOptions): { readonly publicPem: string; readonly pr
       ? generateKeyPairSync('ec', { namedCurve: options.namedCurve })
       : generateKeyPairSync('rsa', { modulusLength: options.modulusLength });
   return {
-    publicPem: publicKey.export({ format: 'pem', type: 'spki' }),
-    privatePem: privateKey.export({ format: 'pem', type: 'pkcs8' }),
+    publicPem: publicKey.export({ format: 'pem', type: 'spki' }).toString(),
+    privatePem: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
   };
 }
 

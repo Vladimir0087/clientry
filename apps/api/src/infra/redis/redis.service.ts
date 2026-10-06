@@ -2,11 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { OnApplicationShutdown } from '@nestjs/common';
 import { Redis } from 'ioredis';
 
+import { createRedisOptions } from './redis-options.js';
 import { AppConfig } from '../config/app-config.js';
-
-// Fail commands fast while Valkey is down; the offline queue still covers the first connect.
-const MAX_RETRIES_PER_REQUEST = 1;
-const MAX_RECONNECT_DELAY_MS = 5000;
 
 @Injectable()
 export class RedisService implements OnApplicationShutdown {
@@ -15,10 +12,7 @@ export class RedisService implements OnApplicationShutdown {
   private isAvailable: boolean | undefined;
 
   constructor(config: AppConfig) {
-    this.client = new Redis(config.redisUrl, {
-      maxRetriesPerRequest: MAX_RETRIES_PER_REQUEST,
-      retryStrategy: (attempt) => Math.min(attempt * 200, MAX_RECONNECT_DELAY_MS),
-    });
+    this.client = new Redis(config.redisUrl, createRedisOptions());
     this.client.on('ready', () => {
       this.setAvailable(true);
     });

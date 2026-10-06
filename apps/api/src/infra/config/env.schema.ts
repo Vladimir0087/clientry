@@ -6,6 +6,7 @@ import { parseSigningKey } from './env-parsers.js';
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 const NON_EMPTY = /^.+$/;
+const APP_VERSION = /^[A-Za-z0-9._-]{1,64}$/;
 
 function urlError(expected: string): (issue: { readonly input: unknown }) => string {
   return (issue) => (issue.input === undefined ? 'is required' : `must be a ${expected} URL`);
@@ -55,6 +56,10 @@ export const envSchema = z.object({
   JWT_PRIVATE_KEY: signingKeySchema,
   TRUSTED_ORIGINS: trustedOriginsSchema,
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
+  APP_VERSION: z
+    .string()
+    .regex(APP_VERSION, 'must be 1-64 letters, digits, dots, underscores or hyphens')
+    .default('local'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -17,6 +17,8 @@ test-results/
 .env
 .env.*
 !.env.example
+# vercel pull writes the project link and its variables here
+.vercel/
 
 # logs
 *.log

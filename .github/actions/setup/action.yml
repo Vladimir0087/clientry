@@ -1,6 +1,11 @@
 name: Setup
 description: Node from .nvmrc, pnpm from packageManager, cached store and frozen install
 
+inputs:
+  web-env:
+    description: Export a throwaway API_URL and JWT_PUBLIC_KEY; off where the real ones are pulled
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -16,8 +21,9 @@ runs:
       env:
         HUSKY: 0
 
-    # Every job loads next.config.ts, which needs both; the private half of the key is discarded.
-    - run: |
+    # next.config.ts needs both outside Vercel builds; the private half of the key is discarded.
+    - if: inputs.web-env == 'true'
+      run: |
         echo "API_URL=http://127.0.0.1:4000" >> "$GITHUB_ENV"
         pnpm --silent --filter @clientry/api jwt:keygen | grep '^JWT_PUBLIC_KEY=' >> "$GITHUB_ENV"
       shell: bash

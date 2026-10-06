@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@12.8.1",
   "engines": {
-    "node": ">=26"
+    "node": ">=24"
   },
   "scripts": {
     "dev": "turbo run dev",
@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "infra:up": "docker compose up -d --wait",
-    "infra:down": "docker compose down",
+    "infra:full": "docker compose --profile full up -d --build --wait",
+    "infra:down": "docker compose --profile full down",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
+    "@types/node": "24.19.1",
     "eslint": "10.11.0",
     "husky": "9.1.7",
     "lint-staged": "17.6.0",

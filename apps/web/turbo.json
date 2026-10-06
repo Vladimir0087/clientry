@@ -11,6 +11,8 @@
       // next build wipes .next/types, which typegen writes and lint and typecheck read.
       "dependsOn": ["^build", "lint", "typecheck"],
       "env": ["API_URL", "JWT_PUBLIC_KEY"],
+      // Vercel's system variables reach next build unhashed: they change on every deploy.
+      "passThroughEnv": ["VERCEL", "VERCEL_*"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.env"],
       "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
     },
