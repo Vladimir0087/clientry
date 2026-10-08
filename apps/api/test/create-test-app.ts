@@ -8,7 +8,7 @@ import { inject } from 'vitest';
 
 import { AppModule } from '../src/app.module.js';
 import { createApp } from '../src/configure-app.js';
-import { TRUSTED_ORIGIN } from './support/test-env.js';
+import { TEST_APP_VERSION, TRUSTED_ORIGIN } from './support/test-env.js';
 import { loadConfig } from '../src/infra/config/app-config.js';
 import type { AppConfig } from '../src/infra/config/app-config.js';
 import { createLogger } from '../src/infra/logger/create-logger.js';
@@ -39,6 +39,7 @@ export function createTestConfig(overrides: TestAppOverrides = {}): AppConfig {
     JWT_PRIVATE_KEY: inject('jwtPrivateKey'),
     TRUSTED_ORIGINS: `${TRUSTED_ORIGIN},http://localhost:4000`,
     TRUST_PROXY_HOPS: String(overrides.trustProxyHops ?? 0),
+    APP_VERSION: TEST_APP_VERSION,
   });
 }
 

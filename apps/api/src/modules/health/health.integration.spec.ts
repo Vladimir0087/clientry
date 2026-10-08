@@ -8,6 +8,7 @@ import {
   UNREACHABLE_REDIS_URL,
 } from '../../../test/create-test-app.js';
 import type { TestApp, TestAppOverrides } from '../../../test/create-test-app.js';
+import { TEST_APP_VERSION } from '../../../test/support/test-env.js';
 
 describe('HealthController', () => {
   let testApp: TestApp | undefined;
@@ -22,13 +23,13 @@ describe('HealthController', () => {
     testApp = undefined;
   });
 
-  it('should answer 200 when liveness is probed', async () => {
+  it('should answer 200 with the configured version when liveness is probed', async () => {
     const { http } = await start();
 
     const response = await http.get('/health/live');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ status: 'ok' });
+    expect(response.body).toEqual({ status: 'ok', version: TEST_APP_VERSION });
   });
 
   it('should answer 200 with both checks up when dependencies are reachable', async () => {

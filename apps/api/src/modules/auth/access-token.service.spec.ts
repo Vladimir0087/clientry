@@ -102,7 +102,7 @@ describe('AccessTokenService', () => {
   });
 
   it('should reject the token when HS256 uses the public key as the secret', async () => {
-    const publicPem = config.jwtPublicKey.export({ format: 'pem', type: 'spki' });
+    const publicPem = config.jwtPublicKey.export({ format: 'pem', type: 'spki' }).toString();
 
     const token = await signRaw({ alg: 'HS256', key: new TextEncoder().encode(publicPem) });
 

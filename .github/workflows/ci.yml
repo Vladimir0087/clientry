@@ -4,6 +4,13 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Deploys the chosen branch; with deploy off it only publishes the image.
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy to Render and Vercel after the checks
+        type: boolean
+        default: true
 
 concurrency:
   group: >-
@@ -12,6 +19,9 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  IMAGE: ghcr.io/vladimir0087/clientry-api
 
 jobs:
   lint:
@@ -22,6 +32,7 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm lint
       - run: pnpm format:check
+      - run: shellcheck .github/scripts/*.sh
 
   typecheck:
     runs-on: ubuntu-latest
@@ -39,3 +50,129 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm build
       - run: pnpm test
+
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: clientry-api:local
+          build-args: APP_VERSION=${{ github.sha }}
+          # One plain image: the digest that passes the smoke test is the one Render runs.
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Generate a throwaway signing key
+        run: |
+          key=$(openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 |
+            awk 'NF { printf "%s\\n", $0 }')
+          echo "JWT_PRIVATE_KEY=$key" >> "$GITHUB_ENV"
+
+      - run: docker compose --profile full up -d --wait --no-build
+
+      - run: bash .github/scripts/smoke-api-container.sh
+
+      - if: failure()
+        run: docker compose --profile full logs
+
+      - name: Publish the tested image
+        id: publish
+        if: github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          for tag in "sha-$GITHUB_SHA" latest; do
+            docker tag clientry-api:local "$IMAGE:$tag"
+            docker push "$IMAGE:$tag"
+          done
+          reference=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' \
+            "$IMAGE:sha-$GITHUB_SHA" | grep "^$IMAGE@")
+          echo "Published $reference"
+          echo "digest=${reference#*@}" >> "$GITHUB_OUTPUT"
+
+  deploy-api:
+    needs: [lint, typecheck, test, image]
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A running deploy always finishes; a newer waiting one replaces an older waiting one.
+    concurrency:
+      group: deploy-api
+      cancel-in-progress: false
+    env:
+      API_PUBLIC_URL: ${{ vars.API_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The digest, never a tag: Render runs exactly the image that passed the smoke test.
+      - name: Deploy the image to Render
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          IMAGE_REF: ${{ env.IMAGE }}@${{ needs.image.outputs.digest }}
+        run: |
+          status=$(curl --silent --show-error --output response.json --write-out '%{http_code}' \
+            --request POST --url-query "imgURL=$IMAGE_REF" "$DEPLOY_HOOK_URL")
+          cat response.json
+          echo
+          case $status in
+            200) echo "Render started the deploy of $IMAGE_REF" ;;
+            202) echo "Render queued the deploy of $IMAGE_REF behind a running one" ;;
+            *)
+              echo "::error::Render's deploy hook answered $status"
+              exit 1
+              ;;
+          esac
+
+      - run: bash .github/scripts/wait-for-api-version.sh "$API_PUBLIC_URL" "$GITHUB_SHA"
+
+  # After the API, so a web build that calls a new endpoint never goes live before it.
+  deploy-web:
+    needs: deploy-api
+    # Skipped until the Vercel project exists.
+    if: vars.VERCEL_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: deploy-web
+      cancel-in-progress: false
+    env:
+      VERCEL_CLI: vercel@62.4.0
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The throwaway API_URL and JWT_PUBLIC_KEY would win over the pulled ones.
+      - uses: ./.github/actions/setup
+        with:
+          web-env: 'false'
+
+      - run: pnpm dlx "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - run: pnpm dlx "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
+
+      - run: pnpm dlx "$VERCEL_CLI" deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+      # No commit: deploy-api checked it, and a newer run's deploy-api may already serve a later one.
+      - run: bash .github/scripts/smoke-live.sh "$WEB_PUBLIC_URL" "$API_PUBLIC_URL"
+        env:
+          WEB_PUBLIC_URL: ${{ vars.WEB_PUBLIC_URL }}
+          API_PUBLIC_URL: ${{ vars.API_PUBLIC_URL }}

@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { delay, http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
 
 import { sessionKeys } from '@/entities/session';
 import { createQueryClient } from '@/shared/api/query-client';
@@ -45,12 +46,27 @@ async function prefetchWith(accessToken: string, queryClient: QueryClient): Prom
 }
 
 describe('prefetchSession', () => {
+  let stdoutWrite: MockInstance<typeof process.stdout.write>;
+
+  function writtenLines(): string[] {
+    return stdoutWrite.mock.calls.map(([chunk]) => String(chunk));
+  }
+
+  beforeEach(() => {
+    stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should put the session in the cache when the API answers 200', async () => {
     const queryClient = createQueryClient();
 
     await prefetchWith(await createAccessToken(), queryClient);
 
     expect(queryClient.getQueryData(sessionKeys.current)).toEqual(TEST_SESSION);
+    expect(writtenLines()).toEqual([]);
   });
 
   it.each([
@@ -68,7 +84,7 @@ describe('prefetchSession', () => {
     expect(queryClient.getQueryData(sessionKeys.current)).toBeUndefined();
   });
 
-  it('should send no request when the access token has expired', async () => {
+  it('should send no request and log nothing when the access token has expired', async () => {
     const counter = countMeRequests(() => ok());
     const queryClient = createQueryClient();
 
@@ -76,5 +92,45 @@ describe('prefetchSession', () => {
 
     expect(counter.count).toBe(0);
     expect(queryClient.getQueryData(sessionKeys.current)).toBeUndefined();
+    expect(writtenLines()).toEqual([]);
+  });
+
+  it.each([
+    [
+      'answers 503',
+      () => problemResponse(503, 'SERVICE_UNAVAILABLE', { requestId: 'req-503' }),
+      { reason: 'http', status: 503, code: 'SERVICE_UNAVAILABLE', requestId: 'req-503' },
+    ],
+    [
+      'answers 401',
+      () => problemResponse(401, 'AUTHENTICATION_REQUIRED', { requestId: 'req-401' }),
+      { reason: 'http', status: 401, code: 'AUTHENTICATION_REQUIRED', requestId: 'req-401' },
+    ],
+    [
+      'answers slower than the limit',
+      async () => delay(TIME_LIMIT_MS + 1000).then(() => ok()),
+      { reason: 'timeout' },
+    ],
+    ['refuses the connection', () => HttpResponse.error(), { reason: 'network' }],
+    [
+      'answers with a body off the schema',
+      () => HttpResponse.json({ user: null }),
+      { reason: 'contract' },
+    ],
+  ])('should log one warning when the API %s', async (_case, resolver, fields) => {
+    countMeRequests(resolver);
+    const accessToken = await createAccessToken();
+
+    await prefetchWith(accessToken, createQueryClient());
+
+    const lines = writtenLines();
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0] ?? '')).toEqual({
+      level: 40,
+      time: expect.any(Number) as unknown,
+      msg: 'Session prefetch failed',
+      ...fields,
+    });
+    expect(lines.join('')).not.toContain(accessToken);
   });
 });

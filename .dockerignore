@@ -1,0 +1,16 @@
+.git
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/.vercel
+**/coverage
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+docs
+.claude
+apps/api/src/infra/prisma/generated
+# The web ships through Vercel; its manifest stays for the workspace install.
+apps/web/*
+!apps/web/package.json

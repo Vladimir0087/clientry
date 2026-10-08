@@ -10,6 +10,7 @@ import type {
 import { CheckTimeoutError } from './check-timeout.error.js';
 import { NotReadyError } from './errors.js';
 import { HealthRepository } from './health.repository.js';
+import { AppConfig } from '../../infra/config/app-config.js';
 import { RedisService } from '../../infra/redis/redis.service.js';
 
 export const CHECK_TIMEOUT_MS = 3000;
@@ -35,10 +36,11 @@ export class HealthService {
   constructor(
     private readonly health: HealthRepository,
     private readonly redis: RedisService,
+    private readonly config: AppConfig,
   ) {}
 
   getLiveness(): LivenessResponse {
-    return { status: 'ok' };
+    return { status: 'ok', version: this.config.appVersion };
   }
 
   async getReadiness(): Promise<ReadinessResponse> {

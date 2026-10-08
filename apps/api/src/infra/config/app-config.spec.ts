@@ -17,7 +17,7 @@ function privateKeyPem(
     options.type === 'ec'
       ? generateKeyPairSync('ec', { namedCurve: options.namedCurve })
       : generateKeyPairSync('rsa', { modulusLength: options.modulusLength });
-  return privateKey.export({ format: 'pem', type: 'pkcs8' });
+  return privateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
 }
 
 const JWT_PRIVATE_KEY = generateSigningKeyPem();
@@ -185,6 +185,31 @@ describe('loadConfig', () => {
       const error = captureConfigError({ ...VALID_ENV, TRUST_PROXY_HOPS: '-1' });
 
       expect(error.issues.map(({ variable }) => variable)).toEqual(['TRUST_PROXY_HOPS']);
+    });
+  });
+
+  describe('APP_VERSION', () => {
+    it('should default to local when the version is missing', () => {
+      const config = loadConfig(VALID_ENV);
+
+      expect(config.appVersion).toBe('local');
+    });
+
+    it.each(['0123abc', 'v1.2.3-rc_1'])('should accept the version when it is %s', (version) => {
+      const config = loadConfig({ ...VALID_ENV, APP_VERSION: version });
+
+      expect(config.appVersion).toBe(version);
+    });
+
+    it.each([
+      ['a space', 's3cret version'],
+      ['a slash', 's3cret/version'],
+      ['65 characters', `s3cret${'a'.repeat(59)}`],
+    ])('should reject the version without quoting it when it has %s', (_case, version) => {
+      const error = captureConfigError({ ...VALID_ENV, APP_VERSION: version });
+
+      expect(error.issues.map(({ variable }) => variable)).toEqual(['APP_VERSION']);
+      expect(error.message).not.toMatch(/s3cret/);
     });
   });
 });

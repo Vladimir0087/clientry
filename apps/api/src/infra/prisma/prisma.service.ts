@@ -5,6 +5,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { AppConfig } from '../config/app-config.js';
 import { PrismaClient } from './generated/client.js';
 import type { Prisma } from './generated/client.js';
+import { createPoolOptions } from './pool-options.js';
 
 type LoggedEvent = 'query' | 'warn' | 'error';
 
@@ -12,9 +13,6 @@ type LoggedEvent = 'query' | 'warn' | 'error';
 type PrismaServiceOptions = Prisma.PrismaClientOptions & {
   log: { emit: 'event'; level: LoggedEvent }[];
 };
-
-// The pg default is no timeout: connects to a host that drops packets would pile up in the pool.
-const CONNECTION_TIMEOUT_MS = 5000;
 
 @Injectable()
 export class PrismaService
@@ -25,10 +23,7 @@ export class PrismaService
 
   constructor(config: AppConfig) {
     super({
-      adapter: new PrismaPg({
-        connectionString: config.databaseUrl,
-        connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
-      }),
+      adapter: new PrismaPg(createPoolOptions(config)),
       log: [
         { emit: 'event', level: 'query' },
         { emit: 'event', level: 'warn' },

@@ -5,6 +5,8 @@ import type { Options } from 'pino-http';
 import { pathWithoutQuery } from '../../common/http/request-path.js';
 
 const HEALTH_PATH_PREFIX = '/health/';
+// Vercel adds the visitor's city, region and coordinates to every proxied request.
+const GEOLOCATION_HEADER_PREFIX = 'x-vercel-ip-';
 
 export function resolveRequestLogLevel(
   request: Request,
@@ -34,15 +36,38 @@ export interface SerializedRequest {
   readonly headers: Readonly<Record<string, unknown>>;
   readonly remoteAddress?: string;
   readonly remotePort?: number;
+  // Non-enumerable in pino's object: the Express request the rest was read from.
+  readonly raw: Pick<Request, 'ip'>;
+}
+
+export interface LoggedRequest extends Omit<SerializedRequest, 'raw'> {
+  // Resolved through trust proxy, so one line shows whether TRUST_PROXY_HOPS is right.
+  readonly clientIp?: string;
 }
 
 interface SerializedResponse {
   readonly statusCode: number;
 }
 
-export function serializeRequest(request: SerializedRequest): SerializedRequest {
-  const { id, method, url, headers, remoteAddress, remotePort } = request;
-  return { id, method, url: pathWithoutQuery(url), headers, remoteAddress, remotePort };
+function withoutGeolocation(
+  headers: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([name]) => !name.startsWith(GEOLOCATION_HEADER_PREFIX)),
+  );
+}
+
+export function serializeRequest(request: SerializedRequest): LoggedRequest {
+  const { id, method, url, headers, remoteAddress, remotePort, raw } = request;
+  return {
+    id,
+    method,
+    url: pathWithoutQuery(url),
+    headers: withoutGeolocation(headers),
+    remoteAddress,
+    remotePort,
+    clientIp: raw.ip,
+  };
 }
 
 export function createHttpLoggerOptions(logger: Logger): Options<Request, Response> {

@@ -18,6 +18,7 @@ export class AppConfig {
   readonly jwtPublicKey: KeyObject;
   readonly trustedOrigins: readonly string[];
   readonly trustProxyHops: number;
+  readonly appVersion: string;
 
   constructor(env: Env) {
     this.nodeEnv = env.NODE_ENV;
@@ -29,6 +30,7 @@ export class AppConfig {
     this.jwtPublicKey = env.JWT_PRIVATE_KEY.publicKey;
     this.trustedOrigins = env.TRUSTED_ORIGINS;
     this.trustProxyHops = env.TRUST_PROXY_HOPS;
+    this.appVersion = env.APP_VERSION;
     Object.freeze(this);
   }
 }
