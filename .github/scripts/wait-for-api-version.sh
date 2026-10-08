@@ -19,7 +19,7 @@ live_version() {
     sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true
 }
 
-# The old instance keeps answering with its own version until Render switches traffic.
+# Until the switch the old version answers, or nothing does: a free deploy may stop it first.
 started_at=$(date +%s)
 while true; do
   version=$(live_version)

@@ -87,9 +87,9 @@ docs/adr/0008-deployment.md
 - Start: `prisma migrate deploy`, then `exec node dist/main.js`, so Node replaces the shell as
   PID 1 and receives SIGTERM itself. No init process: nothing forks once the migrations finish. A
   failed migration exits non-zero and the API never listens.
-- Migrations run while the previous version still serves (Render deploys without downtime), so
-  every migration must work with the code before it. The two-step rule for dangerous changes now
-  matters in production.
+- Zero-downtime deploys are a paid Render feature, so a free deploy may stop the old version
+  first. Every migration must still work with the code before it, since a rollback runs that code
+  against the migrated schema. The two-step rule for dangerous changes now matters in production.
 - Listens on `PORT`; Render sets its own.
 - OCI labels `org.opencontainers.image.source` (links the GHCR package to the repo, which keeps it
   private) and `org.opencontainers.image.revision`.
@@ -195,8 +195,9 @@ Workflow `CI` runs on pull requests, on pushes to `main`, and by manual dispatch
   (a bad `imgURL`), 401, 404 (an image outside the service's repository), 409 (a suspended
   service). Then
   `wait-for-api-version.sh` polls `/health/live`
-  every 10 s for up to 15 minutes until `version` equals the commit (the old instance keeps
-  answering with its own until the switch), and checks `/health/ready` once, which wakes Neon once
+  every 10 s for up to 15 minutes until `version` equals the commit (until the switch the old
+  version answers, or nothing does: a free deploy may stop it first), and checks `/health/ready`
+  once, which wakes Neon once
   per deploy. A failed Render deploy leaves the old version live, the wait times out, the job
   fails.
 - `deploy-web`: the setup action with the throwaway web variables skipped, then
@@ -285,7 +286,8 @@ Free plans, checked on 2026-10-06:
   need CSP changes).
 - UptimeRobot: `GET <api>/health/live` every 5 minutes keeps the API awake without touching the
   database. 31 days × 24 h = 744 h fits the 750 h only while it is the workspace's single free
-  web service. A second monitor on `GET <web>/login` alerts when the web is down. Alerts by email.
+  web service. A second monitor on `GET <web>/login` shows the web's status in the dashboard. No
+  notifications: the owner checks the dashboard instead.
 - Actual names and URLs are recorded in `docs/deployment.md`; a suffix is fine where a name is
   taken.
 
@@ -362,8 +364,7 @@ Free plans, checked on 2026-10-06:
 - A secret between Vercel and the API; a function in front of `/api/*`.
 - Separate database roles for migrations and the app; Neon's pooler and branches.
 - GHCR retention, image signing, SBOM, vulnerability scanning, Dockerfile linting.
-- Error tracking, log drains, alerts beyond UptimeRobot's email; Vercel Analytics and Speed
-  Insights.
+- Error tracking, log drains, downtime notifications; Vercel Analytics and Speed Insights.
 - Demo data and "Log in as demo" (spec 11); e2e against the live host (spec 12); README and badges
   (spec 13); the VPS (spec 14).
 - Moving back to Node 26.

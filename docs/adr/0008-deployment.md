@@ -30,8 +30,9 @@ budgets: Neon gives 100 CU-hours a month and Render sleeps an idle service.
   `read:packages` token; the Vercel project is created through the REST API instead of importing
   the repository, and `git.deploymentEnabled: false` guards against a later connection.
 - **Migrations at container start.** `prisma migrate deploy`, then `exec node dist/main.js`; a
-  failed migration exits and the API never listens. Render deploys without downtime, so every
-  migration must work with the code before it.
+  failed migration exits and the API never listens. Zero-downtime deploys are a paid Render
+  feature, so a free deploy may stop the API briefly; every migration must still work with the
+  code before it, since a rollback runs that code against the migrated schema.
 - **Node 24 everywhere.** Vercel offers Node 24.x at most, and the web's server code runs there;
   `.nvmrc`, CI, the image and `@types/node` follow, so typecheck rejects newer APIs.
 - **Neon's direct connection, verified TLS.** One long-lived process with pg's pool needs no

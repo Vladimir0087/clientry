@@ -27,18 +27,34 @@ flowchart LR
 
 Filled in at setup. Names may carry a suffix where the plain one is taken.
 
-| What                 | Value                                         |
-| -------------------- | --------------------------------------------- |
-| Web                  | `https://<project>.vercel.app`                |
-| Swagger UI           | `https://<project>.vercel.app/api/docs`       |
-| API probes           | `https://<service>.onrender.com/health/live`  |
-| Render web service   | `<service>`                                   |
-| Render Key Value     | `<key value name>`                            |
-| Neon project         | `clientry`, database `clientry`               |
-| Vercel project       | `<project>`                                   |
-| Image                | `ghcr.io/vladimir0087/clientry-api` (private) |
-| UptimeRobot monitors | API liveness, web login                       |
-| `TRUST_PROXY_HOPS`   | `<measured value>`, measured on `<date>`      |
+| What                 | Value                                                                                                |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| Web                  | `https://<project>.vercel.app`                                                                       |
+| Swagger UI           | `https://<project>.vercel.app/api/docs`                                                              |
+| API probes           | `https://clientry-api.onrender.com/health/live`                                                      |
+| Render web service   | `clientry-api`                                                                                       |
+| Render Key Value     | `clientry-valkey`                                                                                    |
+| Neon project         | `clientry` (`little-math-93508455`), branch `production`, database `clientry`, role `clientry_owner` |
+| Vercel project       | `<project>`                                                                                          |
+| Image                | `ghcr.io/vladimir0087/clientry-api` (private)                                                        |
+| UptimeRobot monitors | API liveness, web login                                                                              |
+| `TRUST_PROXY_HOPS`   | `<measured value>`, measured on `<date>`                                                             |
+
+## Consoles
+
+All accounts are the owner's personal ones (personal email, not a work address).
+
+| Service                      | Console                                                                       |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| Neon                         | https://console.neon.tech/app/projects/little-math-93508455                   |
+| Render                       | https://dashboard.render.com                                                  |
+| Vercel                       | https://vercel.com/dashboard                                                  |
+| GHCR package                 | https://github.com/users/Vladimir0087/packages/container/package/clientry-api |
+| GitHub Actions               | https://github.com/Vladimir0087/clientry/actions                              |
+| GitHub secrets               | https://github.com/Vladimir0087/clientry/settings/secrets/actions             |
+| GitHub tokens (classic)      | https://github.com/settings/tokens                                            |
+| GitHub tokens (fine-grained) | https://github.com/settings/personal-access-tokens                            |
+| UptimeRobot                  | https://dashboard.uptimerobot.com                                             |
 
 ## First-time setup
 
@@ -49,7 +65,7 @@ In this order: each step needs a value from the one before.
 On the owner's machine, once:
 
 ```sh
-pnpm --filter @clientry/api jwt:keygen
+pnpm --silent --filter @clientry/api jwt:keygen
 ```
 
 The private line goes only to Render, the public line only to Vercel. Neither is stored anywhere
@@ -57,10 +73,14 @@ else, the repository included.
 
 ### 2. Neon
 
-1. Create project `clientry`: Postgres 18, region AWS `eu-central-1` (Frankfurt), Free plan.
-   The database is `clientry`, with one role for migrations and the app.
-2. Copy the **direct** connection string (not the pooled one, without `-pooler` in the host).
-3. Replace its whole query string with `?sslmode=verify-full&sslaccept=strict`:
+1. Create project `clientry`: Postgres 18, region AWS `eu-central-1` (Frankfurt), Free plan,
+   service Postgres database only. Name the database `clientry` in the same form; Neon creates
+   the role `clientry_owner`, one role for migrations and the app. The default branch is
+   `production`.
+2. Connect → branch `production`, database `clientry`, role `clientry_owner`, connection pooling
+   off. Copy the **direct** connection string (without `-pooler` in the host).
+3. Replace its whole query string, `channel_binding` included, with
+   `?sslmode=verify-full&sslaccept=strict`:
    - pg in the API reads `sslmode`: `verify-full` checks the certificate and the host name.
      Neon's `sslmode=require` means the same to pg today but prints a deprecation warning on
      every start;
@@ -81,6 +101,20 @@ reach it. Its **internal** URL is `REDIS_URL` for Render.
 GitHub → Actions → CI → Run workflow, on the branch being set up, with **deploy unchecked**. The
 `image` job publishes `ghcr.io/vladimir0087/clientry-api:latest` and `:sha-<commit>`. The
 package is linked to the repository by the image's source label and stays private.
+
+GitHub shows the Run workflow button only once `main` has a workflow with `workflow_dispatch`.
+Before the first merge, dispatch through the REST API with a fine-grained token limited to this
+repository with **Actions: read and write**:
+
+```powershell
+$env:GH_TOKEN = Read-Host 'GitHub token'
+$headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
+$body = '{"ref":"<branch>","inputs":{"deploy":"false"}}'
+Invoke-RestMethod -Method Post -Headers $headers -Body $body `
+  -Uri 'https://api.github.com/repos/Vladimir0087/clientry/actions/workflows/ci.yml/dispatches'
+```
+
+No output means GitHub accepted it; the run appears under Actions. `"deploy":"true"` deploys.
 
 ### 5. Registry credential for Render
 
@@ -114,7 +148,7 @@ Write the expiry date into [Expiry and rotation](#expiry-and-rotation).
 4. Environment variables, Production only, both **plain, not sensitive**: `vercel pull` does not
    return sensitive values, and the CI build would stop at the web's env check. Neither is a
    secret.
-   - `API_URL`: the Render origin, `https://<service>.onrender.com`, no trailing slash. Filled in
+   - `API_URL`: the Render origin, `https://clientry-api.onrender.com`, no trailing slash. Filled in
      after step 7, then redeployed.
    - `JWT_PUBLIC_KEY`: the public line from step 1.
 
@@ -157,14 +191,14 @@ Repository → Settings → Secrets and variables → Actions, at repository lev
 on the free plan has no environments; they move to a `production` environment once the repository
 is public).
 
-| Name                     | Kind     | Value                            |
-| ------------------------ | -------- | -------------------------------- |
-| `RENDER_DEPLOY_HOOK_URL` | secret   | step 7                           |
-| `VERCEL_TOKEN`           | secret   | step 6                           |
-| `VERCEL_ORG_ID`          | variable | step 6                           |
-| `VERCEL_PROJECT_ID`      | variable | step 6                           |
-| `API_PUBLIC_URL`         | variable | `https://<service>.onrender.com` |
-| `WEB_PUBLIC_URL`         | variable | `https://<project>.vercel.app`   |
+| Name                     | Kind     | Value                               |
+| ------------------------ | -------- | ----------------------------------- |
+| `RENDER_DEPLOY_HOOK_URL` | secret   | step 7                              |
+| `VERCEL_TOKEN`           | secret   | step 6                              |
+| `VERCEL_ORG_ID`          | variable | step 6                              |
+| `VERCEL_PROJECT_ID`      | variable | step 6                              |
+| `API_PUBLIC_URL`         | variable | `https://clientry-api.onrender.com` |
+| `WEB_PUBLIC_URL`         | variable | `https://<project>.vercel.app`      |
 
 ### 9. First deploy
 
@@ -174,12 +208,13 @@ waits for `/health/live` to report the commit; `deploy-web` builds and deploys t
 
 ### 10. UptimeRobot
 
-Two HTTP(S) monitors, 5-minute interval, alerts by email:
+Two HTTP(S) monitors, 5-minute interval, no notifications (the email alert contact is unchecked
+on both); their status is visible in the dashboard:
 
-- `GET https://<service>.onrender.com/health/live`: keeps the API awake without touching the
+- `GET https://clientry-api.onrender.com/health/live`: keeps the API awake without touching the
   database. 31 days × 24 h = 744 h fits Render's 750 free hours only while this is the
   workspace's single free web service;
-- `GET https://<project>.vercel.app/login`: alerts when the web is down.
+- `GET https://<project>.vercel.app/login`: shows whether the web is up.
 
 ### Measure `TRUST_PROXY_HOPS`
 
@@ -222,7 +257,7 @@ image. The manual run deploys the tested digest instead.
 ### Manual smoke check
 
 ```sh
-bash .github/scripts/smoke-live.sh https://<project>.vercel.app https://<service>.onrender.com [<commit>]
+bash .github/scripts/smoke-live.sh https://<project>.vercel.app https://clientry-api.onrender.com [<commit>]
 ```
 
 ### Rollback
@@ -239,7 +274,7 @@ bash .github/scripts/smoke-live.sh https://<project>.vercel.app https://<service
 | Credential               | Where it lives                    | Expires        | Rotation                                                                                           |
 | ------------------------ | --------------------------------- | -------------- | -------------------------------------------------------------------------------------------------- |
 | `VERCEL_TOKEN`           | GitHub secret                     | `<date + 1 y>` | new token in Vercel, update the secret, delete the old token                                       |
-| GHCR classic token       | Render registry credential        | `<date + 1 y>` | new `read:packages` token, update the credential, delete the old token                             |
+| GHCR classic token       | Render registry credential        | 2027-10-08     | new `read:packages` token, update the credential, delete the old token                             |
 | `RENDER_DEPLOY_HOOK_URL` | GitHub secret                     | never          | regenerate in Render when it may have leaked, update the secret                                    |
 | JWT key pair             | Render (private), Vercel (public) | never          | new `jwt:keygen`, Render with Save only, Vercel, then a manual run; every user signs in again once |
 | Neon role password       | inside `DATABASE_URL`             | never          | reset in Neon, `DATABASE_URL` on Render with Save only, then a manual run                          |
