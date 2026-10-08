@@ -145,6 +145,8 @@ jobs:
   # After the API, so a web build that calls a new endpoint never goes live before it.
   deploy-web:
     needs: deploy-api
+    # Skipped until the Vercel project exists.
+    if: vars.VERCEL_PROJECT_ID != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:

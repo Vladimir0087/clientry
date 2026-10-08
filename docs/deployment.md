@@ -200,6 +200,8 @@ is public).
 | `API_PUBLIC_URL`         | variable | `https://clientry-api.onrender.com` |
 | `WEB_PUBLIC_URL`         | variable | `https://<project>.vercel.app`      |
 
+`deploy-web` is skipped while `VERCEL_PROJECT_ID` is unset.
+
 ### 9. First deploy
 
 Actions → CI → Run workflow on the branch, deploy checked. `deploy-api` deploys the digest and
