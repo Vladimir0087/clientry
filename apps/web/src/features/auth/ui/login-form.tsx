@@ -8,17 +8,17 @@ import type { UseFormReturn } from 'react-hook-form';
 
 import { ApiError } from '@/shared/api/api-error';
 import { REGISTER_PATH } from '@/shared/lib/redirect-target';
+import { applySubmitError } from '@/shared/lib/submit-error';
+import type { FormAlertContent } from '@/shared/lib/submit-error';
 import { FieldGroup } from '@/shared/ui/field';
+import { FormAlert } from '@/shared/ui/form-alert';
+import { SubmitButton } from '@/shared/ui/submit-button';
+import { TextField } from '@/shared/ui/text-field';
 import { loginRequestSchema } from '@clientry/shared/auth';
 import type { LoginRequest } from '@clientry/shared/auth';
 
 import { AuthSwitchLink } from './auth-switch-link';
-import { FormAlert } from './form-alert';
 import { PasswordField } from './password-field';
-import { SubmitButton } from './submit-button';
-import { TextField } from './text-field';
-import { applySubmitError } from '../model/submit-error';
-import type { FormAlertContent } from '../model/submit-error';
 import { useEnterSession } from '../model/use-enter-session';
 import { useLogin } from '../model/use-login';
 
@@ -83,7 +83,9 @@ export function LoginForm({ next }: LoginFormProps): React.JSX.Element {
           {...form.register('password')}
         />
       </FieldGroup>
-      <SubmitButton isSubmitting={isSubmitting || isEntering}>Log in</SubmitButton>
+      <SubmitButton className="w-full" isSubmitting={isSubmitting || isEntering}>
+        Log in
+      </SubmitButton>
       <AuthSwitchLink prompt="No account?" path={REGISTER_PATH} next={next}>
         Create one
       </AuthSwitchLink>

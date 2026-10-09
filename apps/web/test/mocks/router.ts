@@ -9,3 +9,6 @@ export const mockRouter = {
   back: vi.fn(),
   forward: vi.fn(),
 };
+
+// The path usePathname returns; tests set it, setup-dom resets it to '/'.
+export const mockPathname = { current: '/' };

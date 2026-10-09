@@ -3,6 +3,7 @@
 import { environmentManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
+import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import type { ReactNode } from 'react';
 
 import { createQueryClient } from '@/shared/api/query-client';
@@ -33,16 +34,18 @@ interface ProvidersProps {
 export function Providers({ nonce, children }: ProvidersProps): ReactNode {
   return (
     <QueryClientProvider client={getQueryClient()}>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-        nonce={nonce}
-      >
-        {children}
-        <Toaster />
-      </ThemeProvider>
+      <NuqsAdapter>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+          nonce={nonce}
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
+      </NuqsAdapter>
     </QueryClientProvider>
   );
 }

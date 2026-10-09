@@ -1,14 +1,16 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
+import { toast } from 'sonner';
 import { afterEach, vi } from 'vitest';
 
 import { installBrowserApis } from './browser-apis';
-import { mockRouter } from './mocks/router';
+import { mockPathname, mockRouter } from './mocks/router';
 
 // The router and full page navigations are the only mocked modules: jsdom cannot navigate.
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useRouter: () => mockRouter,
+  usePathname: () => mockPathname.current,
 }));
 vi.mock('@/shared/lib/navigation', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -23,7 +25,10 @@ afterEach(() => {
     document.activeElement.blur();
   }
   cleanup();
+  // Sonner keeps toasts in a module-level store that outlives the Toaster of a test.
+  toast.dismiss();
   vi.clearAllMocks();
+  mockPathname.current = '/';
   window.localStorage.clear();
   document.documentElement.className = '';
 });

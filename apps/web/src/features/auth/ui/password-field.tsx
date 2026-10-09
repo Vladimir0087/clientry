@@ -2,15 +2,14 @@ import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useState } from 'react';
 import type * as React from 'react';
 
+import { FormField } from '@/shared/ui/form-field';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
 } from '@/shared/ui/input-group';
-
-import { FormField } from './form-field';
-import type { TextFieldProps } from './text-field';
+import type { TextFieldProps } from '@/shared/ui/text-field';
 
 export function PasswordField({
   label,

@@ -8,6 +8,8 @@ import { UserMenu } from '@/features/auth';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ThemeMenu } from '@/shared/ui/theme-menu';
 
+import { MainNav } from './main-nav';
+
 function WorkspaceName(): React.JSX.Element | null {
   const session = useSession();
   if (session.data !== undefined) {
@@ -26,10 +28,11 @@ function WorkspaceName(): React.JSX.Element | null {
 export function ShellHeader(): React.JSX.Element {
   return (
     <header className="border-b">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-4">
         <Link href="/" className="font-semibold tracking-tight">
           Clientry
         </Link>
+        <MainNav />
         <WorkspaceName />
         <div className="ml-auto flex items-center gap-2">
           <ThemeMenu />

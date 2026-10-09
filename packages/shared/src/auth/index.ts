@@ -10,5 +10,7 @@ export { loginRequestSchema, registerRequestSchema } from './credentials.js';
 export type { LoginRequest, RegisterRequest } from './credentials.js';
 export { memberRoleSchema } from './member-role.js';
 export type { MemberRole } from './member-role.js';
+export { canDeleteRecord } from './permissions.js';
+export type { RecordActor } from './permissions.js';
 export { sessionResponseSchema } from './session.js';
 export type { SessionResponse } from './session.js';

@@ -1,15 +1,13 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { createQueryClient } from '@/shared/api/query-client';
 import { LOGIN_PATH } from '@/shared/lib/redirect-target';
-import { verifyAccessToken } from '@/shared/lib/verify-access-token';
-import { ACCESS_TOKEN_COOKIE } from '@clientry/shared/auth';
 
 import { ShellHeader } from './_components/shell-header';
-import { prefetchSession } from './_lib/prefetch-session';
+import { getPrefetchRequest } from './_lib/access-session';
+import { prefetchSession } from './_lib/prefetch';
 
 const MAIN_ID = 'main';
 
@@ -18,14 +16,13 @@ interface AppLayoutProps {
 }
 
 export default async function AppLayout({ children }: AppLayoutProps): Promise<ReactNode> {
-  const cookieStore = await cookies();
-  const session = await verifyAccessToken(cookieStore.get(ACCESS_TOKEN_COOKIE)?.value);
+  const request = await getPrefetchRequest();
   // The proxy redirects first; this covers a path its matcher misses.
-  if (session.status === 'anonymous') {
+  if (request.session.status === 'anonymous') {
     redirect(LOGIN_PATH);
   }
   const queryClient = createQueryClient();
-  await prefetchSession(queryClient, cookieStore, session);
+  await prefetchSession(queryClient, request);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <a

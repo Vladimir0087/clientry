@@ -34,7 +34,10 @@ async function prisma(args: readonly string[], databaseUrl: string): Promise<voi
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const [postgres, valkey] = await Promise.all([
-    new PostgreSqlContainer(POSTGRES_IMAGE).start(),
+    // Neon's locale: byte order, so only an explicit collation sorts names and tags by language.
+    new PostgreSqlContainer(POSTGRES_IMAGE)
+      .withEnvironment({ POSTGRES_INITDB_ARGS: '--locale=C.UTF-8' })
+      .start(),
     new ValkeyContainer(VALKEY_IMAGE).start(),
   ]);
   const databaseUrl = postgres.getConnectionUri().replace(/^postgres:/, 'postgresql:');
