@@ -13,6 +13,7 @@ import { AppLoggerModule } from './infra/logger/app-logger.module.js';
 import { AccessTokenGuard } from './modules/auth/access-token.guard.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { RolesGuard } from './modules/auth/roles.guard.js';
+import { ClientsModule } from './modules/clients/clients.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 
 export interface AppModuleOptions {
@@ -29,6 +30,7 @@ export class AppModule {
         AppConfigModule.forRoot(config),
         AppLoggerModule.forRoot(logger),
         AuthModule,
+        ClientsModule,
         HealthModule,
       ],
       providers: [

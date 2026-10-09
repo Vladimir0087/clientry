@@ -201,6 +201,86 @@ describe('OpenAPI document', () => {
     );
   });
 
+  describe('clients operations', () => {
+    const CLIENT_OPERATIONS = [
+      ['get', '/api/clients'],
+      ['post', '/api/clients'],
+      ['get', '/api/clients/tags'],
+      ['get', '/api/clients/{id}'],
+      ['patch', '/api/clients/{id}'],
+      ['delete', '/api/clients/{id}'],
+      ['post', '/api/clients/{id}/restore'],
+    ] as const;
+
+    interface Parameter {
+      readonly name: string;
+      readonly in: string;
+    }
+
+    interface Operation {
+      readonly tags?: readonly string[];
+      readonly security?: unknown;
+      readonly parameters?: readonly Parameter[];
+      readonly responses?: Record<string, { content?: Record<string, { schema?: unknown }> }>;
+    }
+
+    function operation(method: string, path: string): Operation | undefined {
+      const paths = document.paths as Record<string, Record<string, Operation> | undefined>;
+      return paths[path]?.[method];
+    }
+
+    function parameterNames(op: Operation | undefined, location: string): string[] {
+      return (op?.parameters ?? []).filter((p) => p.in === location).map(({ name }) => name);
+    }
+
+    it('should document seven operations under /api/clients when the document is built', () => {
+      const paths = Object.entries(document.paths as Record<string, Record<string, unknown>>)
+        .filter(([path]) => path.startsWith('/api/clients'))
+        .flatMap(([path, item]) => Object.keys(item).map((method) => `${method} ${path}`));
+
+      expect(paths.toSorted()).toEqual(
+        CLIENT_OPERATIONS.map(([method, path]) => `${method} ${path}`).toSorted(),
+      );
+    });
+
+    it.each(CLIENT_OPERATIONS)(
+      'should require the access cookie and document 401 when %s %s is documented',
+      (method, path) => {
+        const op = operation(method, path);
+
+        expect(op?.tags).toEqual(['clients']);
+        expect(op?.security).toEqual([{ accessCookie: [] }]);
+        expect(op?.responses?.['401']).toBeDefined();
+      },
+    );
+
+    it.each(CLIENT_OPERATIONS)(
+      'should reference ApiProblem in every error response when %s %s is documented',
+      (method, path) => {
+        const errors = Object.entries(operation(method, path)?.responses ?? {}).filter(
+          ([status]) => Number(status) >= 400,
+        );
+
+        for (const [, response] of errors) {
+          expect(response.content?.['application/problem+json']?.schema).toEqual(PROBLEM_REF);
+        }
+      },
+    );
+
+    it('should list the query parameters by name when the list is documented', () => {
+      expect(parameterNames(operation('get', '/api/clients'), 'query').toSorted()).toEqual(
+        ['q', 'source', 'tag', 'createdBy', 'sort', 'cursor', 'limit'].toSorted(),
+      );
+    });
+
+    it.each(CLIENT_OPERATIONS.filter(([, path]) => path.includes('{id}')))(
+      'should document the id path parameter when %s %s is documented',
+      (method, path) => {
+        expect(parameterNames(operation(method, path), 'path')).toEqual(['id']);
+      },
+    );
+  });
+
   it('should leave health probes out when the document is built', () => {
     const paths = Object.keys(document.paths as Record<string, unknown>);
 

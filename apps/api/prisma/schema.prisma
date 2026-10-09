@@ -16,6 +16,15 @@ enum MemberRole {
   @@map("member_role")
 }
 
+enum ClientSource {
+  website
+  telegram
+  referral
+  other
+
+  @@map("client_source")
+}
+
 enum StageKind {
   open
   won
@@ -33,6 +42,7 @@ model User {
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
   membership   Membership?
   sessions     Session[]
+  clients      Client[]
 
   @@map("users")
 }
@@ -44,6 +54,7 @@ model Workspace {
   updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
   memberships Membership[]
   stages      Stage[]
+  clients     Client[]
 
   @@map("workspaces")
 }
@@ -99,4 +110,33 @@ model RefreshToken {
 
   @@index([sessionId])
   @@map("refresh_tokens")
+}
+
+model Client {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  createdById String        @map("created_by_id") @db.Uuid
+  // The migration gives this column the "und-x-icu" collation, which Prisma does not model.
+  name        String
+  company     String?
+  email       String?
+  phone       String?
+  source      ClientSource?
+  notes       String?
+  tags        String[]      @default([])
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?     @map("deleted_at") @db.Timestamptz(3)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt, id])
+  @@index([workspaceId, name, id])
+  @@index([createdById])
+  @@index([tags], type: Gin)
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([company(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([email(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([phone(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@map("clients")
 }

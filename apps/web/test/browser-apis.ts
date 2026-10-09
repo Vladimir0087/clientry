@@ -1,4 +1,4 @@
-// jsdom lacks the APIs that Radix menus and next-themes call; these are inert stand-ins.
+// jsdom lacks the APIs that Radix menus, sonner and next-themes call; these are inert stand-ins.
 class ResizeObserverStub {
   observe = (): void => undefined;
   unobserve = (): void => undefined;
@@ -24,5 +24,7 @@ export function installBrowserApis(): void {
   window.matchMedia = matchMediaStub;
   Element.prototype.hasPointerCapture = (): boolean => false;
   Element.prototype.releasePointerCapture = (): void => undefined;
+  // Sonner captures the pointer when a toast is pressed, to let it be swiped away.
+  Element.prototype.setPointerCapture = (): void => undefined;
   Element.prototype.scrollIntoView = (): void => undefined;
 }

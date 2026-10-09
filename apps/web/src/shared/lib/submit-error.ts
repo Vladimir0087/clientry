@@ -1,3 +1,4 @@
+import type { Route } from 'next';
 import type { FieldValues, Path, UseFormReturn } from 'react-hook-form';
 
 import { ApiError } from '@/shared/api/api-error';
@@ -11,6 +12,7 @@ const GENERIC_MESSAGE = 'Something went wrong. Try again.';
 export interface FormAlertContent {
   readonly message: string;
   readonly reference?: string;
+  readonly link?: { readonly href: Route; readonly label: string };
 }
 
 function pluralize(count: number, unit: string): string {
@@ -35,6 +37,14 @@ function unexpectedAlert(error: unknown): FormAlertContent {
   };
 }
 
+// tags.1 belongs to the tags field: an item's error shows on the control that holds the list.
+function findField<T extends FieldValues>(
+  fields: readonly Path<T>[],
+  path: string,
+): Path<T> | undefined {
+  return fields.find((name) => path === name || path.startsWith(`${name}.`));
+}
+
 // A path that matches no field still reaches the user through the form alert.
 function applyFieldErrors<T extends FieldValues>(
   form: UseFormReturn<T>,
@@ -44,7 +54,7 @@ function applyFieldErrors<T extends FieldValues>(
   const unmatched: string[] = [];
   let hasFocused = false;
   for (const { path, message } of errors) {
-    const field = fields.find((name) => name === path);
+    const field = findField(fields, path);
     if (field === undefined) {
       unmatched.push(message);
     } else {
@@ -55,7 +65,7 @@ function applyFieldErrors<T extends FieldValues>(
   return unmatched.length === 0 ? null : { message: unmatched.join(' ') };
 }
 
-// The outcomes both auth forms share; each form handles its own codes before calling this.
+// The outcomes every form shares; each form handles its own codes before calling this.
 export function applySubmitError<T extends FieldValues>(
   error: unknown,
   form: UseFormReturn<T>,

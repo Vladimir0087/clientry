@@ -1,0 +1,15 @@
+export const CLIENT_LIMITS = {
+  name: 200,
+  company: 200,
+  email: 254,
+  phone: 32,
+  phoneMinDigits: 5,
+  notes: 5000,
+  tags: 10,
+  tag: 32,
+  search: 100,
+  sources: 4,
+  cursor: 2048,
+  defaultPageSize: 25,
+  maxPageSize: 100,
+} as const;
