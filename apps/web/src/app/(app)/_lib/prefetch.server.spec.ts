@@ -4,16 +4,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
 
 import { clientKeys, normalizeClientFilters } from '@/entities/client';
+import { dealKeys, stageKeys } from '@/entities/deal';
+import { memberKeys } from '@/entities/member';
 import { sessionKeys } from '@/entities/session';
 import { loadClientFilters } from '@/features/client-filters';
+import { loadBoardFilters } from '@/features/deal-filters';
 import { createQueryClient } from '@/shared/api/query-client';
 import type { CookieReader } from '@/shared/api/server-client';
 import { verifyAccessToken } from '@/shared/lib/verify-access-token';
 import { ACCESS_TOKEN_COOKIE } from '@clientry/shared/auth';
 
-import { prefetchClient, prefetchClientList, prefetchSession } from './prefetch';
+import {
+  prefetchBoard,
+  prefetchClient,
+  prefetchClientDeals,
+  prefetchClientList,
+  prefetchDeal,
+  prefetchDealHistory,
+  prefetchMembers,
+  prefetchSession,
+  prefetchStages,
+} from './prefetch';
 import type { PrefetchRequest } from './prefetch';
 import { TEST_CLIENT, TEST_CLIENT_LIST } from '../../../../test/clients';
+import { makeBoard, TEST_DEAL, TEST_MEMBERS, TEST_STAGES } from '../../../../test/deals';
 import { TEST_SESSION } from '../../../../test/fixtures';
 import { problemResponse } from '../../../../test/msw/problem';
 import { server } from '../../../../test/msw/server';
@@ -230,6 +244,80 @@ describe('prefetch', () => {
         TEST_CLIENT.id,
       );
 
+      expect(writtenLines()).toEqual([]);
+    });
+  });
+
+  describe('deals', () => {
+    const board = makeBoard([TEST_DEAL]);
+    const history = { items: [], hasMore: false };
+    const clientDeals = { items: [TEST_DEAL], hasMore: false };
+
+    it('should fill the keys the hooks read when every deal query answers 200', async () => {
+      countRequests('/api/deals/board', () => HttpResponse.json(board));
+      countRequests(`/api/deals/${TEST_DEAL.id}`, () => HttpResponse.json(TEST_DEAL));
+      countRequests(`/api/deals/${TEST_DEAL.id}/history`, () => HttpResponse.json(history));
+      countRequests('/api/deals', () => HttpResponse.json(clientDeals));
+      const queryClient = createQueryClient();
+      const request = await requestWith(await createAccessToken());
+
+      await Promise.all([
+        prefetchBoard(queryClient, request, { isMine: false }),
+        prefetchDeal(queryClient, request, TEST_DEAL.id),
+        prefetchDealHistory(queryClient, request, TEST_DEAL.id),
+        prefetchStages(queryClient, request),
+        prefetchMembers(queryClient, request),
+        prefetchClientDeals(queryClient, request, TEST_CLIENT.id),
+      ]);
+
+      expect(queryClient.getQueryData(dealKeys.board({ isMine: false }))).toEqual(board);
+      expect(queryClient.getQueryData(dealKeys.detail(TEST_DEAL.id))).toEqual(TEST_DEAL);
+      expect(queryClient.getQueryData(dealKeys.history(TEST_DEAL.id))).toEqual(history);
+      expect(queryClient.getQueryData(stageKeys.list)).toEqual(TEST_STAGES);
+      expect(queryClient.getQueryData(memberKeys.list)).toEqual(TEST_MEMBERS);
+      expect(queryClient.getQueryData(dealKeys.byClient(TEST_CLIENT.id))).toEqual(clientDeals);
+      expect(writtenLines()).toEqual([]);
+    });
+
+    it('should fill the key the client hook builds when the URL has mine=true', async () => {
+      const counter = countRequests('/api/deals/board', () => HttpResponse.json(board));
+      const queryClient = createQueryClient();
+      const filters = await loadBoardFilters(Promise.resolve({ mine: 'true' }));
+
+      await prefetchBoard(queryClient, await requestWith(await createAccessToken()), filters);
+
+      expect(queryClient.getQueryData(dealKeys.board({ isMine: true }))).toEqual(board);
+      expect(counter.urls.map((url) => new URL(url).search)).toEqual(['?assignee=me']);
+    });
+
+    it('should log one warning with the label when the board fails', async () => {
+      countRequests('/api/deals/board', () => problemResponse(503, 'SERVICE_UNAVAILABLE'));
+
+      await prefetchBoard(createQueryClient(), await requestWith(await createAccessToken()), {
+        isMine: false,
+      });
+
+      const lines = writtenLines();
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0] ?? '')).toMatchObject({
+        msg: 'Board prefetch failed',
+        reason: 'http',
+        status: 503,
+      });
+    });
+
+    it('should log nothing when the deal is not found', async () => {
+      const counter = countRequests(`/api/deals/${TEST_DEAL.id}`, () =>
+        problemResponse(404, 'DEAL_NOT_FOUND'),
+      );
+
+      await prefetchDeal(
+        createQueryClient(),
+        await requestWith(await createAccessToken()),
+        TEST_DEAL.id,
+      );
+
+      expect(counter.count).toBe(1);
       expect(writtenLines()).toEqual([]);
     });
   });

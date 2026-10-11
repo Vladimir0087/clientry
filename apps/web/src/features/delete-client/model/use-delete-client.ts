@@ -3,7 +3,9 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-import { clientKeys, CLIENTS_PATH, deleteClient, isNotFound } from '@/entities/client';
+import { clientKeys, CLIENTS_PATH, deleteClient } from '@/entities/client';
+import { dealKeys, stageKeys } from '@/entities/deal';
+import { isNotFound } from '@/shared/api/api-status';
 import { requestHeadingFocus } from '@/shared/lib/heading-focus';
 
 import { useRestoreClient } from './use-restore-client';
@@ -23,6 +25,10 @@ export function useDeleteClient(): UseMutationResult<void, Error, string> {
     void queryClient.invalidateQueries({ queryKey: clientKeys.lists });
     void queryClient.invalidateQueries({ queryKey: clientKeys.tags });
     void queryClient.invalidateQueries({ queryKey: clientKeys.detail(id), refetchType: 'none' });
+    // The client's deals are hidden with it, and the stages count only visible deals. Only marked
+    // stale too: the card would refetch its deals, now none, behind the leaving dialog.
+    void queryClient.invalidateQueries({ queryKey: dealKeys.all, refetchType: 'none' });
+    void queryClient.invalidateQueries({ queryKey: stageKeys.all, refetchType: 'none' });
   };
 
   return useMutation({

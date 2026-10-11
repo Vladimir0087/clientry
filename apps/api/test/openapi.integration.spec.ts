@@ -281,6 +281,120 @@ describe('OpenAPI document', () => {
     );
   });
 
+  describe('deals, stages and members operations', () => {
+    const OPERATIONS = [
+      ['get', '/api/deals/board', 'deals'],
+      ['get', '/api/deals', 'deals'],
+      ['post', '/api/deals', 'deals'],
+      ['get', '/api/deals/{id}', 'deals'],
+      ['patch', '/api/deals/{id}', 'deals'],
+      ['post', '/api/deals/{id}/move', 'deals'],
+      ['delete', '/api/deals/{id}', 'deals'],
+      ['post', '/api/deals/{id}/restore', 'deals'],
+      ['get', '/api/deals/{id}/history', 'deals'],
+      ['get', '/api/stages', 'stages'],
+      ['post', '/api/stages', 'stages'],
+      ['patch', '/api/stages/{id}', 'stages'],
+      ['put', '/api/stages/order', 'stages'],
+      ['delete', '/api/stages/{id}', 'stages'],
+      ['get', '/api/members', 'members'],
+    ] as const;
+
+    const STAGE_WRITES = OPERATIONS.filter(
+      ([method, , tag]) => tag === 'stages' && method !== 'get',
+    );
+
+    interface Parameter {
+      readonly name: string;
+      readonly in: string;
+    }
+
+    interface ProblemContent {
+      readonly schema?: unknown;
+      readonly example?: { readonly code?: string };
+      readonly examples?: Record<string, unknown>;
+    }
+
+    interface Operation {
+      readonly tags?: readonly string[];
+      readonly security?: unknown;
+      readonly parameters?: readonly Parameter[];
+      readonly responses?: Record<string, { content?: Record<string, ProblemContent> }>;
+    }
+
+    function operation(method: string, path: string): Operation | undefined {
+      const paths = document.paths as Record<string, Record<string, Operation> | undefined>;
+      return paths[path]?.[method];
+    }
+
+    function parameterNames(op: Operation | undefined, location: string): string[] {
+      return (op?.parameters ?? []).filter((p) => p.in === location).map(({ name }) => name);
+    }
+
+    it('should document 15 operations under deals, stages and members when the document is built', () => {
+      const paths = Object.entries(document.paths as Record<string, Record<string, unknown>>)
+        .filter(([path]) => /^\/api\/(deals|stages|members)/.test(path))
+        .flatMap(([path, item]) => Object.keys(item).map((method) => `${method} ${path}`));
+
+      expect(paths.toSorted()).toEqual(
+        OPERATIONS.map(([method, path]) => `${method} ${path}`).toSorted(),
+      );
+    });
+
+    it.each(OPERATIONS)(
+      'should tag, require the access cookie and document 401 when %s %s is documented',
+      (method, path, tag) => {
+        const op = operation(method, path);
+
+        expect(op?.tags).toEqual([tag]);
+        expect(op?.security).toEqual([{ accessCookie: [] }]);
+        expect(op?.responses?.['401']).toBeDefined();
+      },
+    );
+
+    it.each(OPERATIONS)(
+      'should reference ApiProblem in every error response when %s %s is documented',
+      (method, path) => {
+        const errors = Object.entries(operation(method, path)?.responses ?? {}).filter(
+          ([status]) => Number(status) >= 400,
+        );
+
+        for (const [, response] of errors) {
+          expect(response.content?.['application/problem+json']?.schema).toEqual(PROBLEM_REF);
+        }
+      },
+    );
+
+    it.each(STAGE_WRITES)(
+      'should list 403 INSUFFICIENT_ROLE when %s %s is documented',
+      (method, path) => {
+        const content = operation(method, path)?.responses?.['403']?.content?.[
+          'application/problem+json'
+        ];
+
+        expect(Object.keys(content?.examples ?? {})).toContain('INSUFFICIENT_ROLE');
+      },
+    );
+
+    it.each([
+      ['get', '/api/deals/board', 'assignee'],
+      ['get', '/api/deals', 'clientId'],
+      ['delete', '/api/stages/{id}', 'moveDealsTo'],
+    ] as const)(
+      'should list the query parameter when %s %s is documented',
+      (method, path, name) => {
+        expect(parameterNames(operation(method, path), 'query')).toEqual([name]);
+      },
+    );
+
+    it.each(OPERATIONS.filter(([, path]) => path.includes('{id}')))(
+      'should document the id path parameter when %s %s is documented',
+      (method, path) => {
+        expect(parameterNames(operation(method, path), 'path')).toEqual(['id']);
+      },
+    );
+  });
+
   it('should leave health probes out when the document is built', () => {
     const paths = Object.keys(document.paths as Record<string, unknown>);
 

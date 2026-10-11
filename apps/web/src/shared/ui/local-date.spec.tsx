@@ -24,4 +24,15 @@ describe('LocalDate', () => {
     expect(time.tagName).toBe('TIME');
     expect(time).toHaveAttribute('dateTime', VALUE);
   });
+
+  it('should show the date and the time when hasTime is set', () => {
+    const expected = new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(VALUE));
+
+    render(<LocalDate value={VALUE} hasTime />);
+
+    expect(screen.getByText(expected).tagName).toBe('TIME');
+  });
 });

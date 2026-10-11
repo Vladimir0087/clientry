@@ -3,11 +3,15 @@ import 'server-only';
 import type { QueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 
-import { clientKeys, clientListPath, isNotFound } from '@/entities/client';
+import { clientKeys, clientListPath } from '@/entities/client';
 import type { ClientFilters } from '@/entities/client';
+import { boardPath, dealKeys, stageKeys } from '@/entities/deal';
+import type { BoardFilters } from '@/entities/deal';
+import { memberKeys } from '@/entities/member';
 import { sessionKeys } from '@/entities/session';
 import { ApiError } from '@/shared/api/api-error';
 import type { ApiPath } from '@/shared/api/api-path';
+import { isNotFound } from '@/shared/api/api-status';
 import { NetworkError } from '@/shared/api/network-error';
 import { ResponseContractError } from '@/shared/api/response-contract-error';
 import { serverGet } from '@/shared/api/server-client';
@@ -17,6 +21,14 @@ import type { ServerLogFields } from '@/shared/lib/server-log';
 import type { AccessSession } from '@/shared/lib/verify-access-token';
 import { sessionResponseSchema } from '@clientry/shared/auth';
 import { clientListResponseSchema, clientResponseSchema } from '@clientry/shared/clients';
+import {
+  boardResponseSchema,
+  dealHistoryResponseSchema,
+  dealListResponseSchema,
+  dealSchema,
+  stageListResponseSchema,
+} from '@clientry/shared/deals';
+import { memberListResponseSchema } from '@clientry/shared/workspaces';
 
 const PREFETCH_TIMEOUT_MS = 1000;
 
@@ -112,6 +124,83 @@ export function prefetchClient(
     queryClient.query({
       queryKey: clientKeys.detail(id),
       queryFn: ({ signal }) => fetch(`/api/clients/${id}`, clientResponseSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchBoard(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+  filters: BoardFilters,
+): Promise<void> {
+  return prefetch(request, { label: 'Board' }, (fetch) =>
+    queryClient.query({
+      queryKey: dealKeys.board(filters),
+      queryFn: ({ signal }) => fetch(boardPath(filters), boardResponseSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchDeal(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+  id: string,
+): Promise<void> {
+  return prefetch(request, { label: 'Deal', isExpected: isNotFound }, (fetch) =>
+    queryClient.query({
+      queryKey: dealKeys.detail(id),
+      queryFn: ({ signal }) => fetch(`/api/deals/${id}`, dealSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchDealHistory(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+  id: string,
+): Promise<void> {
+  return prefetch(request, { label: 'Deal history', isExpected: isNotFound }, (fetch) =>
+    queryClient.query({
+      queryKey: dealKeys.history(id),
+      queryFn: ({ signal }) => fetch(`/api/deals/${id}/history`, dealHistoryResponseSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchClientDeals(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+  clientId: string,
+): Promise<void> {
+  const query = new URLSearchParams({ clientId }).toString();
+  return prefetch(request, { label: 'Client deals' }, (fetch) =>
+    queryClient.query({
+      queryKey: dealKeys.byClient(clientId),
+      queryFn: ({ signal }) => fetch(`/api/deals?${query}`, dealListResponseSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchStages(queryClient: QueryClient, request: PrefetchRequest): Promise<void> {
+  return prefetch(request, { label: 'Stages' }, (fetch) =>
+    queryClient.query({
+      queryKey: stageKeys.list,
+      queryFn: ({ signal }) => fetch('/api/stages', stageListResponseSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchMembers(queryClient: QueryClient, request: PrefetchRequest): Promise<void> {
+  return prefetch(request, { label: 'Members' }, (fetch) =>
+    queryClient.query({
+      queryKey: memberKeys.list,
+      queryFn: ({ signal }) => fetch('/api/members', memberListResponseSchema, signal),
       retry: false,
     }),
   );

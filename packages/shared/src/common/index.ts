@@ -1,5 +1,6 @@
 export { apiProblemSchema, fieldErrorSchema } from './api-problem.js';
 export type { ApiProblem, FieldError } from './api-problem.js';
+export { idSchema } from './id.js';
 export { InvalidConfigError } from './invalid-config-error.js';
 export type { ConfigIssue } from './invalid-config-error.js';
 export { oneOrMany } from './one-or-many.js';

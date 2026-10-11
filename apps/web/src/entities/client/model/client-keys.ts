@@ -4,6 +4,7 @@ export const clientKeys = {
   all: ['clients'],
   lists: ['clients', 'list'],
   list: (filters: ClientFilters) => ['clients', 'list', filters] as const,
+  search: (q: string) => ['clients', 'list', 'search', q] as const,
   detail: (id: string) => ['clients', 'detail', id] as const,
   tags: ['clients', 'tags'],
 } as const;
