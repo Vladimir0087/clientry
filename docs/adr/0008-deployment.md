@@ -1,6 +1,6 @@
 # 0008 — Deployment
 
-Status: accepted
+Status: accepted; the web host is superseded by 0011
 Date: 2026-10-06
 
 ## Context

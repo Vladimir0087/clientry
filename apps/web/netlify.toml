@@ -1,0 +1,7 @@
+[build]
+  command = "pnpm turbo run build --filter=@clientry/web"
+  # Resolved from the repository root, not from this file's directory.
+  publish = "apps/web/.next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

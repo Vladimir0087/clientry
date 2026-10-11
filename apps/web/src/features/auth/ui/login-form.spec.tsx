@@ -133,6 +133,23 @@ describe('LoginForm', () => {
     expect(alert).toHaveTextContent('Reference: req-500');
   });
 
+  it('should say the server is waking up when a host answers 502 without problem details', async () => {
+    answerLogin(
+      () =>
+        new HttpResponse('<html>Bad Gateway</html>', {
+          status: 502,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+    );
+    renderLoginForm();
+
+    await submit();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('The server is waking up or busy. Try again in a minute.');
+    expect(alert).not.toHaveTextContent('Reference');
+  });
+
   it('should show the generic alert without a reference when the browser is offline', async () => {
     onlineManager.setOnline(false);
     answerLogin(() => HttpResponse.error());

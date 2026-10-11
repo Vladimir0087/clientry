@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: Deploy to Render and Vercel after the checks
+        description: Deploy to Render and Netlify after the checks
         type: boolean
         default: true
 
@@ -145,31 +145,28 @@ jobs:
   # After the API, so a web build that calls a new endpoint never goes live before it.
   deploy-web:
     needs: deploy-api
-    # Skipped until the Vercel project exists.
-    if: vars.VERCEL_PROJECT_ID != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
       group: deploy-web
       cancel-in-progress: false
     env:
-      VERCEL_CLI: vercel@62.4.0
-      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      NETLIFY_CLI: netlify-cli@27.12.0
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
     steps:
       - uses: actions/checkout@v7
 
-      # The throwaway API_URL and JWT_PUBLIC_KEY would win over the pulled ones.
+      # The throwaway API_URL and JWT_PUBLIC_KEY could shadow the site's own.
       - uses: ./.github/actions/setup
         with:
           web-env: 'false'
 
-      - run: pnpm dlx "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN"
-
-      - run: pnpm dlx "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
-
-      - run: pnpm dlx "$VERCEL_CLI" deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      # Builds, uploads and publishes; a failed build publishes nothing. pnpm's dlx needs
+      # --package for a package with two binaries.
+      - run: >-
+          pnpm --package="$NETLIFY_CLI" dlx netlify deploy --prod --context production
+          --filter @clientry/web --message "$GITHUB_SHA"
 
       # No commit: deploy-api checked it, and a newer run's deploy-api may already serve a later one.
       - run: bash .github/scripts/smoke-live.sh "$WEB_PUBLIC_URL" "$API_PUBLIC_URL"
