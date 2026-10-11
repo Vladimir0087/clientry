@@ -17,8 +17,8 @@ test-results/
 .env
 .env.*
 !.env.example
-# vercel pull writes the project link and its variables here
-.vercel/
+# Netlify's CLI writes its state and the bundled functions here
+.netlify/
 
 # logs
 *.log

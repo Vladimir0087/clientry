@@ -2,10 +2,12 @@ import { act, renderHook } from '@testing-library/react';
 import { useForm } from 'react-hook-form';
 import { describe, expect, it } from 'vitest';
 
-import { ApiError } from '@/shared/api/api-error';
+import { ApiError, UNEXPECTED_RESPONSE } from '@/shared/api/api-error';
 
-import { applySubmitError } from './submit-error';
+import { applySubmitError, unexpectedAlert } from './submit-error';
 import type { FormAlertContent } from './submit-error';
+
+const GENERIC_MESSAGE = 'Something went wrong. Try again.';
 
 interface Values {
   readonly name: string;
@@ -44,5 +46,27 @@ describe('applySubmitError', () => {
     });
 
     expect(alert).toEqual({ message: 'Unknown' });
+  });
+});
+
+describe('unexpectedAlert', () => {
+  it('should ask to retry in a minute when a server error has no problem details', () => {
+    const error = new ApiError({ status: 504, code: UNEXPECTED_RESPONSE });
+
+    expect(unexpectedAlert(error)).toEqual({
+      message: 'The server is waking up or busy. Try again in a minute.',
+    });
+  });
+
+  it("should keep the generic message with the reference when the API's own 500 fails", () => {
+    const error = new ApiError({ status: 500, code: 'INTERNAL_ERROR', requestId: 'req-500' });
+
+    expect(unexpectedAlert(error)).toEqual({ message: GENERIC_MESSAGE, reference: 'req-500' });
+  });
+
+  it('should keep the generic message when a client error has no problem details', () => {
+    const error = new ApiError({ status: 404, code: UNEXPECTED_RESPONSE });
+
+    expect(unexpectedAlert(error)).toEqual({ message: GENERIC_MESSAGE, reference: undefined });
   });
 });

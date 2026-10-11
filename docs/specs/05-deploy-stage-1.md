@@ -2,11 +2,15 @@
 
 Status: approved
 
+Amended on 2026-10-11: Vercel declined the account at sign-up, so the web moves to Netlify
+(ADR 0011). The API, the database, Valkey and the API's CI path are unchanged and live since the
+first merge of this spec.
+
 ## 1. Goal
 
-The app runs on free hosting (the web on Vercel, the API on Render with Neon and Render Key Value),
-every green commit on `main` reaches it through CI, and sign-up, login and refresh work through the
-Vercel proxy on the live URL.
+The app runs on free hosting (the web on Netlify, the API on Render with Neon and Render Key
+Value), every green commit on `main` reaches it through CI, and sign-up, login and refresh work
+through the web's proxy on the live URL.
 
 ## 2. In scope / Out of scope
 
@@ -16,7 +20,7 @@ Vercel proxy on the live URL.
 
 ```
 .dockerignore
-.gitignore                               # .vercel
+.gitignore                               # .netlify
 .nvmrc                                   # 24
 package.json                             # engines, infra:full, infra:down, @types/node
 compose.yaml                             # profile full: the API image
@@ -38,28 +42,31 @@ apps/api/
   src/modules/health/                    # version in liveness
   src/main.ts                            # version in the startup line
 apps/web/
-  vercel.json
-  turbo.json                             # Vercel system variables pass through
-  package.json                           # @types/node
+  netlify.toml
+  package.json                           # @types/node, @netlify/plugin-nextjs
   src/shared/lib/server-log.ts
+  src/shared/lib/submit-error.ts         # the waking-up alert
+  src/shared/api/api-status.ts           # isApiUnreachable
   src/app/(app)/_lib/prefetch-session.ts # logs failures
 packages/shared/
   package.json                           # files
   src/health/                            # version in livenessResponseSchema
 docs/deployment.md                       # runbook
 docs/adr/0008-deployment.md
+docs/adr/0011-web-on-netlify.md
+docs/specs/14-deploy-stage-2.md          # the web stays on Netlify
 ```
 
 **Runtime: Node 24 LTS**
 
-- Vercel runs functions on Node 24.x at most (20.x, 22.x and 24.x are offered; checked
-  2026-10-06), and the web's server code runs there. One major everywhere: `.nvmrc` becomes `24`,
-  so CI, the API image and Vercel run the same Node. `engines.node` becomes `>=24`, so a local
-  Node 26 still installs without warnings.
+- Netlify's functions run on AWS Lambda with the Node major the build ran on, and new sites default
+  to 24 (checked 2026-10-11); the web's server code runs there. One major everywhere: `.nvmrc`
+  becomes `24`, so CI, the API image and the web's functions run the same Node. `engines.node`
+  becomes `>=24`, so a local Node 26 still installs without warnings.
 - Every `@types/node` in the workspace moves to the latest 24.x, so typecheck rejects an API newer
   than the runtime. The root lists it too: pnpm resolves the peers it installs automatically
   (commitlint's, vitest's in `@clientry/shared`) from the root, which would otherwise pick 26.
-- Moving back to 26 once Vercel offers it is a separate PR.
+- Moving to 26 is a separate PR, once Lambda offers it.
 
 **API image (`apps/api/Dockerfile`)**
 
@@ -93,9 +100,10 @@ docs/adr/0008-deployment.md
 - Listens on `PORT`; Render sets its own.
 - OCI labels `org.opencontainers.image.source` (links the GHCR package to the repo, which keeps it
   private) and `org.opencontainers.image.revision`.
-- `.dockerignore`: `.git`, every `node_modules`, `dist`, `.next`, `.turbo`, `.vercel`, coverage,
+- `.dockerignore`: `.git`, every `node_modules`, `dist`, `.next`, `.turbo`, `.netlify`, coverage,
   `.env` and `.env.*`, `docs`, `.claude`, and the web app's sources (its `package.json` stays for
-  the workspace install). `.gitignore` gains `.vercel`, which `vercel pull` writes.
+  the workspace install). `.gitignore` gains `.netlify`, where Netlify's CLI writes its state and
+  the bundled functions.
 
 **Compose profile `full`**
 
@@ -115,7 +123,7 @@ docs/adr/0008-deployment.md
   `http://localhost` as a secure context. `pnpm infra:up` keeps starting only Postgres and Valkey;
   `pnpm infra:down` becomes `docker compose --profile full down`, so it removes the `api`
   container too.
-- The profile holds the API only. The web ships to Vercel as a Vercel build on both hosting
+- The profile holds the API only. The web ships to Netlify as a Netlify build on both hosting
   stages, so a web Dockerfile would be a third build path that nothing deploys.
 
 **API changes**
@@ -137,32 +145,41 @@ docs/adr/0008-deployment.md
 - Request log lines:
   - gain `clientIp`, `req.ip` as Express resolves it with `trust proxy`, so `TRUST_PROXY_HOPS` is
     checked by reading one line;
-  - drop `x-vercel-ip-*` headers: Vercel adds the visitor's city, region and coordinates to every
-    proxied request, and the log has no use for them. `x-vercel-id` and `x-forwarded-for` stay.
+  - drop the geolocation headers the web's host forwards (a visitor's city, region or
+    coordinates), which the log has no use for; `x-forwarded-for` and the host's request id stay.
+    Netlify does not document which headers its functions receive, so the list comes from the
+    first live request log behind Netlify; if none arrive, the filter goes.
 
 **Web changes**
 
 - `shared/lib/server-log.ts` (`server-only`) writes one JSON line per event to stdout in pino's
-  shape (`level`, `time`, `msg`, then fields); Vercel keeps stdout as runtime logs. No logger
+  shape (`level`, `time`, `msg`, then fields); Netlify keeps stdout as function logs. No logger
   dependency for one call site, and `no-console` stays an error.
 - `prefetchSession` still renders without data on any failure, and now logs one `warn`
   `Session prefetch failed` with `reason` (`timeout`, `http`, `network`, `contract`,
   `unexpected`), plus `status`, `code` and `requestId` for an HTTP failure. Never a cookie or a
   token.
-- `apps/web/vercel.json`:
-  - `regions: ["fra1"]`: the proxy, page rendering and the prefetch run in Frankfurt, next to the
-    API and the database;
-  - `git.deploymentEnabled: false`: the project has no Git connection, and this keeps Vercel from
-    building on push if one is ever added; production deploys come only from CI, and there are no
-    preview deployments;
-  - `installCommand` `pnpm install --frozen-lockfile` and `buildCommand`
-    `turbo run build --filter=@clientry/web`, so `@clientry/shared` is built first.
-- Vercel toolbar: it is injected into preview deployments, and there are none; it is also turned
-  off for production in the project settings. The nonce CSP stays as it is, without `vercel.live`.
-- HSTS: Vercel itself sends `Strict-Transport-Security: max-age=63072000; includeSubDomains;
-preload` on `*.vercel.app`. Nothing in `next.config.ts`.
-- `turbo.json` of the web lets Vercel's system variables (`VERCEL`, `VERCEL_*`) through strict env
-  mode for `build`, without hashing them.
+- `apps/web/netlify.toml`:
+  - build command `pnpm turbo run build --filter=@clientry/web`, so `@clientry/shared` is built
+    first; publish directory `apps/web/.next`, relative to the repository root although the file
+    sits in `apps/web`, because the CLI resolves it from the base directory;
+  - plugin `@netlify/plugin-nextjs`, a dev dependency of the web pinned to an exact version, so the
+    adapter changes only through the lockfile.
+- The adapter turns the app into one server function (pages, route handlers and the `/api/*`
+  rewrite) and one edge function for `proxy.ts`, which runs the Node-runtime proxy on Deno through
+  the adapter's polyfills. A local `netlify build` and `netlify serve` on 2026-10-10 packaged both
+  and put the response's nonce on every `<script>` tag; a signed-in request is first checked live.
+- `next.config.ts` stays as it is. The rewrite's proxy timeout keeps Next's default of 30 s, which
+  equals Netlify's limit for a synchronous function.
+- No Git connection and builds stopped in the site settings: production deploys come only from CI,
+  and there are no deploy previews or branch deploys. Netlify's drawer is injected only into those,
+  so the nonce CSP stays as it is.
+- HSTS: Netlify itself sends `Strict-Transport-Security: max-age=31536000; includeSubDomains;
+preload` on `*.netlify.app` (seen on another site on 2026-10-10). Nothing in `next.config.ts`
+  while the first deploy shows it there; if it does not, the same header joins the security
+  headers in `next.config.ts`. `smoke-live.sh` fails on every deploy if it goes missing.
+- The web's `turbo.json` loses the Vercel pass-through and keeps its env list: the local Netlify
+  build produced the adapter's standalone output in strict env mode without any change.
 
 **CI and deploy**
 
@@ -174,7 +191,7 @@ Workflow `CI` runs on pull requests, on pushes to `main`, and by manual dispatch
 | `lint`, `typecheck`, `test` | every run                      | as now; `lint` also runs `shellcheck` on `.github/scripts`                                  |
 | `image`                     | every run                      | builds the API image, starts the `full` profile, smoke test; on `main` and dispatch, pushes |
 | `deploy-api`                | `main` push, dispatch `deploy` | after the four above: deploys the pushed digest to Render and waits for it                  |
-| `deploy-web`                | same                           | after `deploy-api`: builds the web, deploys it to Vercel production, checks the live site   |
+| `deploy-web`                | same                           | after `deploy-api`: builds the web, deploys it to Netlify production, checks the live site  |
 
 - `image`:
   - Buildx with the GitHub Actions cache, loaded into the runner's Docker as `clientry-api:local`.
@@ -200,18 +217,23 @@ Workflow `CI` runs on pull requests, on pushes to `main`, and by manual dispatch
   once, which wakes Neon once
   per deploy. A failed Render deploy leaves the old version live, the wait times out, the job
   fails.
-- `deploy-web`: the setup action with the throwaway web variables skipped, then
-  `vercel pull --environment=production`, `vercel build --prod`, `vercel deploy --prebuilt --prod`,
-  with the Vercel CLI run as `pnpm dlx vercel@<exact version>`: no dependency and nothing installed
-  outside the runner. The build runs on CI's Node and pnpm and takes `API_URL` and `JWT_PUBLIC_KEY`
-  only from the Vercel project. Then `smoke-live.sh`.
+- `deploy-web`: the setup action with the throwaway web variables skipped, then one
+  `netlify deploy --prod` for `@clientry/web` in the production context, with the commit as the
+  deploy's message. The CLI runs as `pnpm --package=netlify-cli@<exact version> dlx netlify`
+  (pnpm's `dlx` refuses a package with two binaries otherwise): no dependency and nothing installed
+  outside the runner. The command builds on CI's Node and pnpm, takes `API_URL` and
+  `JWT_PUBLIC_KEY` only from the Netlify site, uploads the result and publishes it; a failed build
+  publishes nothing. Then `smoke-live.sh`. The job runs on every deploy, without the temporary
+  `VERCEL_PROJECT_ID` condition.
 - The throwaway `API_URL` and `JWT_PUBLIC_KEY` of spec 04 stay in every other job. In
-  `deploy-web` they would win over the pulled values and bake a local address and a throwaway key
+  `deploy-web` they could shadow the site's values and bake a local address and a throwaway key
   into production, hence the input; `smoke-live.sh` would catch a wrong `API_URL` anyway.
-- `smoke-live.sh <web> <api> [<commit>]`: `GET <web>/login` 200 with the nonce CSP and HSTS;
-  `GET <web>/` without cookies redirects to `/login`; `GET <web>/api/docs/openapi.json` 200 JSON,
-  so the proxy reaches the API; `GET <api>/health/live` reports the commit when given. The owner
-  can run it by hand.
+- `smoke-live.sh <web> <api> [<commit>]`: `GET <web>/login` 200 with the nonce CSP and HSTS, and
+  every `<script>` tag carries the CSP's nonce; `GET <web>/` without cookies redirects to
+  `/login`; `GET <web>/api/docs/openapi.json` 200 JSON, so the proxy reaches the API;
+  `GET <api>/health/live` reports the commit when given. Requests through the web give up after
+  35 s, past Netlify's 30 s; the direct API request waits up to 90 s for a sleeping service. The
+  owner can run it by hand.
 - The API deploys first, so a web build that calls a new endpoint never goes live before the API
   that serves it.
 - `deploy-api` and `deploy-web` each have their own concurrency group (`deploy-api`,
@@ -220,41 +242,53 @@ Workflow `CI` runs on pull requests, on pushes to `main`, and by manual dispatch
   and the commits in between are skipped. Separate groups keep one run's `deploy-web` from
   cancelling another run's waiting `deploy-api`.
 - Manual dispatch deploys the chosen branch. It is how this spec is checked on the live host before
-  the merge, and later serves as a redeploy. It is also how a changed Vercel variable reaches
-  production: the web is built in CI, and `API_URL` is baked into the rewrite there. A redeploy of the live commit passes the version wait at once, so only `smoke-live.sh` checks it.
-  Dispatch with `deploy` false only publishes the image: the very first one, which the Render
-  service is created from. Rollback uses the hosts' own
-  tools: Render's rollback to an earlier deploy and Vercel's Instant Rollback. Migrations are
-  forward-only, so a rolled-back API must still work with the migrated schema.
+  the merge, and later serves as a redeploy. It is also how a changed Netlify variable reaches
+  production: the web is built in CI, and `API_URL` is baked into the rewrite there. A redeploy of
+  the live commit passes the version wait at once, so only `smoke-live.sh` checks it. Dispatch with
+  `deploy` false only publishes the image: the very first one, which the Render service is created
+  from.
+- Rollback uses the hosts' own tools: Render's rollback to an earlier deploy, and on Netlify
+  "Publish deploy" on an earlier production deploy. The next CI deploy publishes over a Netlify
+  rollback; a rollback that must hold also locks auto publishing, and CI's web deploy fails while
+  the site is locked. Migrations are forward-only, so a rolled-back API must still work with the
+  migrated schema.
 - Platform auto-deploys are off: neither host is connected to the repository. The Render service
-  is image-backed, the Vercel project is created without importing the repo, and
-  `git.deploymentEnabled: false` guards against a later connection.
+  is image-backed; the Netlify site is created through Netlify's API without a repository, and its
+  builds are stopped.
 
 GitHub secrets and variables live at repo level: a private repo on the free plan has no
 environments. They move to a `production` environment once the repo is public (spec 13).
 
-| Name                                 | Kind     | Value                            |
-| ------------------------------------ | -------- | -------------------------------- |
-| `RENDER_DEPLOY_HOOK_URL`             | secret   | the service's deploy hook        |
-| `VERCEL_TOKEN`                       | secret   | account token, expires in a year |
-| `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | variable | from the Vercel project          |
-| `API_PUBLIC_URL`, `WEB_PUBLIC_URL`   | variable | live origins                     |
+| Name                               | Kind     | Value                                     |
+| ---------------------------------- | -------- | ----------------------------------------- |
+| `RENDER_DEPLOY_HOOK_URL`           | secret   | the service's deploy hook                 |
+| `NETLIFY_AUTH_TOKEN`               | secret   | personal access token, the longest expiry |
+| `NETLIFY_SITE_ID`                  | variable | the site's id from the creating request   |
+| `API_PUBLIC_URL`, `WEB_PUBLIC_URL` | variable | live origins                              |
 
 **Hosting**
 
-Free plans, checked on 2026-10-06:
+Free plans, checked on 2026-10-06 (the web on 2026-10-11):
 
-| Part     | Where                            | Plan, region                                      | Limits that matter                                                                            |
-| -------- | -------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| web      | Vercel Hobby                     | functions in `fra1`                               | Node 24.x at most; HSTS on `*.vercel.app`; the proxy waits up to 120 s for the API            |
-| api      | Render web service, image-backed | Free, Frankfurt                                   | 512 MB, 0.1 CPU; sleeps after 15 min without traffic, about 1 min to wake; 750 h per month    |
-| Valkey   | Render Key Value                 | Free, Frankfurt                                   | 25 MB, 50 connections, no persistence, internal URL only                                      |
-| Postgres | Neon                             | Free, AWS `eu-central-1` (Frankfurt), Postgres 18 | 1 GB storage, 100 CU-hours per month, scales to zero after 5 min (cannot be disabled on Free) |
-| images   | GHCR, private package            | —                                                 | storage and transfer currently free                                                           |
-| pinger   | UptimeRobot                      | Free                                              | 5-minute interval, non-commercial use                                                         |
+| Part     | Where                            | Plan, region                                      | Limits that matter                                                                                              |
+| -------- | -------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| web      | Netlify                          | legacy Free; functions in `us-east-2` (Ohio)      | per month 125k function invocations per site, 1M edge function invocations, 100 GB; a function stops after 30 s |
+| api      | Render web service, image-backed | Free, Frankfurt                                   | 512 MB, 0.1 CPU; sleeps after 15 min without traffic, about 1 min to wake; 750 h per month                      |
+| Valkey   | Render Key Value                 | Free, Frankfurt                                   | 25 MB, 50 connections, no persistence, internal URL only                                                        |
+| Postgres | Neon                             | Free, AWS `eu-central-1` (Frankfurt), Postgres 18 | 1 GB storage, 100 CU-hours per month, scales to zero after 5 min (cannot be disabled on Free)                   |
+| images   | GHCR, private package            | —                                                 | storage and transfer currently free                                                                             |
+| pinger   | UptimeRobot                      | Free                                              | 5-minute interval, non-commercial use                                                                           |
 
-- One region: Render and Neon in Frankfurt, Vercel functions in `fra1`. Browsers reach the nearest
-  Vercel edge, which proxies `/api/*` to Render.
+- Render and Neon in Frankfurt. The web's edge function (the proxy) runs at the edge nearest the
+  browser, but its server function runs in Ohio: choosing a function region is a paid feature. A
+  page render, the session prefetch and every proxied API call cross the Atlantic twice, about
+  0.2 s more per call than a function in Frankfurt; the prefetch's 1 s budget includes that.
+  Accepted for the demo.
+- Netlify account: the owner's existing one, still on the legacy Free plan of accounts created
+  before September 2025. Its plan must never change: credit-based plans are one-way, and their free
+  tier pauses every site when the month's credits run out. Going over the legacy limits applies a
+  paid add-on, which an account without a card cannot pay, so its sites are paused; the demo's
+  traffic is far below them.
 - Render web service:
   - image `ghcr.io/vladimir0087/clientry-api:latest` with a registry credential: the GitHub user
     and a classic token with `read:packages` only (fine-grained tokens cannot read packages),
@@ -280,10 +314,11 @@ Free plans, checked on 2026-10-06:
     only with `sslaccept=strict`, against the system roots that the image's base stage installs.
     Neon refuses connections without TLS anyway, so migrations never run in plain text. Checked
     against the Prisma 7 connection URL reference at implementation time.
-- Vercel project: created without importing the repository (one request to Vercel's REST API with
-  the account token), so Vercel gets no access to it, like Render. Then in the panel: root
-  directory `apps/web`, Node 24.x, toolbar off, Web Analytics and Speed Insights off (they would
-  need CSP changes).
+- Netlify site: created without a repository (one request to Netlify's REST API with the personal
+  access token), so Netlify gets no access to it, like Render. Then in the panel: builds stopped;
+  the two variables below; analytics, forms and snippet injection left off (they would need CSP
+  changes). The account's GitHub App from earlier projects keeps access only to those
+  repositories.
 - UptimeRobot: `GET <api>/health/live` every 5 minutes keeps the API awake without touching the
   database. 31 days × 24 h = 744 h fits the 750 h only while it is the workspace's single free
   web service. A second monitor on `GET <web>/login` shows the web's status in the dashboard. No
@@ -293,7 +328,7 @@ Free plans, checked on 2026-10-06:
 
 **Configuration**
 
-| Variable           | Render (api)           | Vercel (web, production)       | Notes                                         |
+| Variable           | Render (api)           | Netlify (web)                  | Notes                                         |
 | ------------------ | ---------------------- | ------------------------------ | --------------------------------------------- |
 | `NODE_ENV`         | `production`           | —                              | Secure cookies                                |
 | `LOG_LEVEL`        | `info`                 | —                              |                                               |
@@ -304,34 +339,38 @@ Free plans, checked on 2026-10-06:
 | `TRUST_PROXY_HOPS` | measured, below        | —                              |                                               |
 | `PORT`             | Render's own           | —                              | not set by us                                 |
 | `APP_VERSION`      | baked into the image   | —                              | not set in the panel                          |
-| `API_URL`          | —                      | `https://<api host>`           | not sensitive, see below                      |
-| `JWT_PUBLIC_KEY`   | —                      | from the same `jwt:keygen` run | not sensitive, see below                      |
+| `API_URL`          | —                      | `https://<api host>`           | plain, see below                              |
+| `JWT_PUBLIC_KEY`   | —                      | from the same `jwt:keygen` run | plain, see below                              |
 
 - The production key pair is generated once on the owner's machine; the private half goes only to
-  Render and the public half only to Vercel, nowhere else. A mismatch shows as a login that lands
+  Render and the public half only to Netlify, nowhere else. A mismatch shows as a login that lands
   back on `/login`. Rotation: both panels, then a manual dispatch, which redeploys both and sends
   every user to `/login` once (ADR 0007).
-- Both Vercel variables are created as plain, not sensitive: `vercel pull` does not return
-  sensitive values, so the CI build would stop at the web's env check. Neither is a secret.
+- Both Netlify variables are plain, not marked as secret. Neither is one, and `API_URL` is baked
+  into the build output, which Netlify's secret scanning rejects for a variable marked secret.
+  Both reach builds, functions and edge functions: the proxy reads them at runtime.
 - `.env.example` gains no hosting values: one comment points to `docs/deployment.md`, another
   says `APP_VERSION` comes from the image build.
 
 **Client IP behind two proxies**
 
-- A browser request reaches the API through Vercel's edge and Render's proxy. Vercel overwrites
-  `X-Forwarded-For` with the visitor's address, so a client cannot spoof it through Vercel, and
-  Render appends its own hops. `TRUST_PROXY_HOPS` must equal those hops; Render does not document
-  them, so they are measured on the live host: deploy with `0`, log in once through the web, read
-  `x-forwarded-for` and `clientIp` in the Render log, set the value at which `clientIp` is the
-  browser's public address, redeploy. The procedure stays in `docs/deployment.md`; a host change
-  means measuring again.
+- A browser request reaches the API through Netlify (its edge, then the server function, whose
+  rewrite forwards the incoming headers) and Render's proxy, which appends its own hops. Neither
+  documents what it does to `X-Forwarded-For`; Netlify guarantees only `x-nf-client-connection-ip`.
+  `TRUST_PROXY_HOPS` must equal the hops after the browser's address, so they are measured on the
+  live host: deploy with `0`, log in once through the web, read `x-forwarded-for` and `clientIp` in
+  the Render log, set the value at which `clientIp` is the browser's public address, redeploy.
+  Then a login through the web with a forged `X-Forwarded-For: 203.0.113.9` must still log the
+  real address: whatever Netlify does with a client's own header, it must not choose `clientIp`.
+  The procedure stays in `docs/deployment.md`; a host change means measuring again.
 - With `0` every visitor shares one rate-limit bucket; that lasts only for the measurement.
 - Known gap: the API also answers at its Render URL. A client calling it there directly can put
   any address into `X-Forwarded-For` and spread attempts over many buckets. Closing it needs a
-  secret that only Vercel adds, which `rewrites` cannot do without sending every API call through
-  a function. Accepted for the demo; argon2 on 0.1 CPU caps throughput anyway.
-- Server-side calls (the session prefetch) come from Vercel's function and carry its address; `me`
-  has no rate limit.
+  secret that only the web adds: Next's `rewrites` cannot add one, and Netlify's signed proxy
+  header exists only for Netlify's own proxy rules, which this setup does not use. Accepted for the
+  demo; argon2 on 0.1 CPU caps throughput anyway.
+- Server-side calls (the session prefetch) come from Netlify's function in Ohio and carry an AWS
+  address; `me` has no rate limit.
 
 **Docs**
 
@@ -343,28 +382,42 @@ Free plans, checked on 2026-10-06:
   - build once in CI and deploy the image digest to Render, over Render building from Git (a
     second build, and Render would need repo access) and over a public image (exposes the code
     before launch);
-  - web built in CI and deployed prebuilt, over Vercel's Git builds (no gate on green CI, a second
-    toolchain, and Vercel detects pnpm only up to 10);
+  - web built in CI and deployed prebuilt, over the host's Git builds (no gate on green CI, a
+    second toolchain);
   - API before web; one region;
   - liveness as Render's health check because of Neon's compute budget;
-  - neither host connected to the repository: the Vercel project is created through the API, not
-    by importing the repo;
+  - neither host connected to the repository;
   - migrations at container start over Render's pre-deploy command, which free services lack and
     which would not carry over to the VPS of stage 2;
-  - Node 24 everywhere because of Vercel;
+  - Node 24 everywhere;
   - Neon's direct connection over its pooler; `sslmode=verify-full` for pg and `sslaccept=strict`
     for Prisma's schema engine, so both readers of the URL verify the certificate;
   - the `X-Forwarded-For` gap of the direct Render URL;
   - repo-level secrets until the repo is public.
 
+  It was written for Vercel and stays as accepted; its status line points to ADR 0011 for the web.
+
+- `docs/adr/0011-web-on-netlify.md`:
+  - Netlify's legacy Free plan on the owner's existing account, over Cloudflare Workers (the free
+    plan's 10 ms of CPU per request and 3 MB per worker do not fit a Next server), a second Render
+    service (the pinged API already uses 744 of the workspace's 750 free hours) and a new Vercel
+    account (it would sidestep Vercel's decision);
+  - CLI build and deploy in CI, with the site created through the API and builds stopped;
+  - Next's rewrite for `/api/*` kept, over Netlify's proxy rules: those time out after 26 s, and
+    the adapter's catch-all function would likely be matched before them;
+  - the consequences: functions in Ohio, a 30 s limit on a proxied call, the plan that must not
+    change, `TRUST_PROXY_HOPS` measured again, rollback that the next deploy overrides.
+- `docs/specs/14-deploy-stage-2.md`: the web stays on Netlify; `API_URL` changes there.
+
 ### Out of scope
 
 - A web Docker image.
 - A custom domain; preview deployments; a staging environment.
-- A secret between Vercel and the API; a function in front of `/api/*`.
+- A secret between the web and the API; a function in front of `/api/*`; Netlify's proxy rules.
+- A paid Netlify plan or function region; moving the account to credit-based pricing.
 - Separate database roles for migrations and the app; Neon's pooler and branches.
 - GHCR retention, image signing, SBOM, vulnerability scanning, Dockerfile linting.
-- Error tracking, log drains, downtime notifications; Vercel Analytics and Speed Insights.
+- Error tracking, log drains, downtime notifications; Netlify Analytics.
 - Demo data and "Log in as demo" (spec 11); e2e against the live host (spec 12); README and badges
   (spec 13); the VPS (spec 14).
 - Moving back to Node 26.
@@ -394,8 +447,8 @@ Live URLs, filled in at setup and kept in `docs/deployment.md`:
 
 | What       | URL                                                           |
 | ---------- | ------------------------------------------------------------- |
-| web        | `https://<project>.vercel.app`                                |
-| Swagger UI | `https://<project>.vercel.app/api/docs`                       |
+| web        | `https://<site>.netlify.app`                                  |
+| Swagger UI | `https://<site>.netlify.app/api/docs`                         |
 | API probes | `https://<service>.onrender.com/health/live`, `/health/ready` |
 
 ## 5. UI
@@ -403,8 +456,14 @@ Live URLs, filled in at setup and kept in `docs/deployment.md`:
 No new screens. The screens of spec 04 now run on the live host:
 
 - `/login` and `/register` render without the API, so a visitor sees the form at once even while
-  Render wakes up. The first request after a sleep can take about a minute; Vercel's proxy waits up
-  to 120 s and the button keeps its spinner meanwhile. With the pinger running this is rare.
+  Render wakes up. Waking takes about a minute, and Netlify's function gives up after 30 s, so the
+  first submit after a sleep fails; a retry once the API is up succeeds. With the pinger running
+  the API does not sleep.
+- A form alert tells that case apart: a server error whose body is not the API's problem details
+  (the hosts' 500, 502 or 504 while the API is unreachable) shows "The server is waking up or
+  busy. Try again in a minute." without a reference. The API's own errors keep "Something went
+  wrong. Try again." with the request id. Every form and the delete dialog share it through
+  `unexpectedAlert`; toasts stay as they are.
 - Every screen is checked on the live host at 390×844 and 1280×800, in light and dark themes.
 
 ## 6. Tests
@@ -416,9 +475,9 @@ No new screens. The screens of spec 04 now run on the live host:
     10 s, connection string from config.
   - Redis client options: command timeout 2 s; the other options as before.
   - Health service: liveness returns the configured version.
-  - Request serializer: `clientIp` from `req.ip`; `x-vercel-ip-city` and `x-vercel-ip-latitude`
-    dropped; `x-vercel-id` and `x-forwarded-for` kept; `cookie` and `authorization` still
-    redacted.
+  - Request serializer: `clientIp` from `req.ip`; the geolocation headers seen behind Netlify
+    dropped, if any arrive; the host's request id and `x-forwarded-for` kept; `cookie` and
+    `authorization` still redacted.
 - **Integration, apps/api**
   - `/health/live` → 200 with the version from the test config.
   - `SHOW statement_timeout` through the app's Prisma client → `10s`.
@@ -430,6 +489,11 @@ No new screens. The screens of spec 04 now run on the live host:
     connection and a body off the schema → exactly one `warn` line each with the matching `reason`,
     plus `status`, `code` and `requestId` for HTTP; success and an `expired` cookie → no line; the
     cookie value never appears. The existing prefetch tests stay.
+- **Unit, apps/web (jsdom)**
+  - Unexpected alert: a 504 without problem details → the waking-up message without a reference;
+    the API's own 500 → the generic message with its request id; a 404 without problem details →
+    the generic message.
+  - Login form: an HTML 502 from MSW → the waking-up alert without a reference.
 - **Container**: `smoke-api-container.sh` in the `image` job, as in section 2.
 - **Live**: `wait-for-api-version.sh` and `smoke-live.sh` on every deploy, as in section 2.
 - **e2e**: none (spec 12). The live checks of section 7 are done by hand and with
@@ -454,10 +518,11 @@ No new screens. The screens of spec 04 now run on the live host:
       the API nor in `@clientry/shared`; its size is in the PR description.
 - [ ] CI on this PR: `lint`, `typecheck`, `test`, `image`, `pr-title` green; nothing is pushed to
       GHCR from a pull request.
-- [ ] Neon, Render (service and Key Value), the GHCR credential, Vercel, GitHub secrets and
+- [ ] Neon, Render (service and Key Value), the GHCR credential, Netlify, GitHub secrets and
       variables, and UptimeRobot are set up as `docs/deployment.md` describes; every hosting
       variable of section 2 is set in its panel; `.env.example` is updated. Neither Render nor
-      Vercel is connected to the repository; both Vercel variables are plain, not sensitive.
+      Netlify is connected to the repository; the site's builds are stopped; both Netlify
+      variables are plain; the account is still on the legacy Free plan.
 - [ ] `DATABASE_URL` on Render ends in `?sslmode=verify-full&sslaccept=strict`; the API starts
       without pg's SSL deprecation warning, and `migrate deploy` in the Render deploy log connects
       without a TLS or certificate error.
@@ -466,29 +531,33 @@ No new screens. The screens of spec 04 now run on the live host:
 - [ ] Live: register → `/` with the name; both cookies on the web domain with `Secure`, `HttpOnly`
       and the `SameSite` and paths of spec 03; no token in the page source.
 - [ ] Live: after 15 idle minutes a reload renders without visiting `/login`, and Network shows one
-      `refresh` 200, so the refresh cookie crosses the Vercel proxy both ways.
+      `refresh` 200, so the refresh cookie crosses the Netlify proxy both ways.
 - [ ] Live: log out → `/login`; Back stays signed out.
 - [ ] Live: `curl` login through the web with `Origin: https://evil.example` → 403
       `UNTRUSTED_ORIGIN`.
 - [ ] `TRUST_PROXY_HOPS` is measured and set: `clientIp` in the Render log is the browser's public
-      address; the eleventh wrong password within a minute gets the 429 alert, and right after it
-      a login from another network (a phone on mobile data) still works.
-- [ ] Live: pages carry the nonce CSP, HSTS and the headers of spec 04; no CSP violation in the
-      console; no Vercel toolbar.
+      address, also when the request carries a forged `X-Forwarded-For`; the eleventh wrong
+      password within a minute gets the 429 alert, and right after it a login from another
+      network (a phone on mobile data) still works.
+- [ ] Live: pages carry the nonce CSP, HSTS and the headers of spec 04; every `<script>` tag carries
+      the nonce; no CSP violation in the console; a signed-in page renders through the edge proxy.
 - [ ] Live: Swagger UI opens at `<web>/api/docs`, and "Try it out" on `me` works after logging in.
 - [ ] Render's health check is `/health/live`; 10 minutes without visitors leave Neon's compute
       suspended in its console while the API stays awake.
-- [ ] With the pinger paused until the API sleeps, the login form renders at once and the first
-      login succeeds through the proxy within Vercel's 120 s.
-- [ ] Render logs: one JSON line per request with `clientIp`, no `x-vercel-ip-*` headers, no
-      cookies. A failed session prefetch shows one `warn` line in Vercel's runtime logs.
+- [ ] With the pinger paused until the API sleeps, the login form renders at once; the first
+      submit ends within about 30 s in "The server is waking up or busy. Try again in a minute.",
+      and a retry once the API is up logs in.
+- [ ] Render logs: one JSON line per request with `clientIp`, no geolocation headers, no cookies.
+      A failed session prefetch shows one `warn` line in Netlify's function logs.
 - [ ] `browser-verify` against the live URL over the screens of spec 04 at both sizes and in both
       themes: no failed requests except the expected 401 before a refresh, and no console errors
       except the browser's own line for that 401.
 - [ ] After the merge, the `main` run deploys by itself and the live `/health/live` reports the
       merge commit.
 - [ ] `prisma` is in `dependencies`; every install script is allowed or denied in `allowBuilds`;
-      the Vercel CLI version is pinned in the workflow.
+      the Netlify CLI version is pinned in the workflow and the adapter's in the web's
+      `package.json`.
 - [ ] Every tooling check from section 6 fails as described.
-- [ ] `docs/deployment.md` and ADR 0008 are written.
+- [ ] `docs/deployment.md`, ADR 0008 and ADR 0011 are written; ADR 0008's status points to 0011;
+      spec 14 names Netlify; no `vercel` is left in code, CI or the runbook.
 - [ ] This spec is part of the PR.

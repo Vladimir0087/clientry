@@ -12,7 +12,7 @@ export type ServerLogFields = Readonly<Record<string, string | number | undefine
   readonly msg?: never;
 };
 
-// One JSON line per event on stdout, which Vercel keeps as runtime logs.
+// One JSON line per event on stdout, which Netlify keeps as function logs.
 export function writeServerLog(
   level: ServerLogLevel,
   msg: string,

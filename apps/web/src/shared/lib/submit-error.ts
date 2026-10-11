@@ -2,12 +2,14 @@ import type { Route } from 'next';
 import type { FieldValues, Path, UseFormReturn } from 'react-hook-form';
 
 import { ApiError } from '@/shared/api/api-error';
+import { isApiUnreachable } from '@/shared/api/api-status';
 import type { FieldError } from '@clientry/shared/common';
 
 const VALIDATION_FAILED = 'VALIDATION_FAILED';
 const TOO_MANY_REQUESTS = 429;
 const SECONDS_PER_MINUTE = 60;
 const GENERIC_MESSAGE = 'Something went wrong. Try again.';
+const UNREACHABLE_MESSAGE = 'The server is waking up or busy. Try again in a minute.';
 
 export interface FormAlertContent {
   readonly message: string;
@@ -32,6 +34,9 @@ function rateLimitAlert(retryAfterSeconds: number | undefined): FormAlertContent
 }
 
 export function unexpectedAlert(error: unknown): FormAlertContent {
+  if (isApiUnreachable(error)) {
+    return { message: UNREACHABLE_MESSAGE };
+  }
   return {
     message: GENERIC_MESSAGE,
     reference: error instanceof ApiError ? error.requestId : undefined,

@@ -3,8 +3,9 @@
 # Usage: smoke-live.sh <web origin> <api origin> [<commit>]
 set -euo pipefail
 
-# Vercel's proxy waits up to 120 s for an API that is waking up.
-readonly REQUEST_TIMEOUT_S=130
+# Netlify stops a function after 30 s; a sleeping Render service takes about a minute to wake.
+readonly WEB_TIMEOUT_S=35
+readonly API_TIMEOUT_S=90
 
 if (($# < 2 || $# > 3)) || [[ -z $1 || -z $2 ]]; then
   echo "usage: $0 <web origin> <api origin> [<commit>]" >&2
@@ -28,7 +29,7 @@ pass() {
 # Prints the status line and headers, then the body; never follows redirects. A failed request
 # prints nothing, so its checks fail and the rest still run.
 fetch() {
-  curl --silent --show-error --include --max-time "$REQUEST_TIMEOUT_S" "$1" | tr -d '\r' || true
+  curl --silent --show-error --include --max-time "$2" "$1" | tr -d '\r' || true
 }
 
 status_of() {
@@ -41,16 +42,25 @@ header_of() {
   sed -n '/^$/q;p' <<<"$1" | grep -i "^$2:" | head -n 1 | cut -d ' ' -f 2- || true
 }
 
-login=$(fetch "$web/login")
+login=$(fetch "$web/login" "$WEB_TIMEOUT_S")
 if [[ $(status_of "$login") != 200 ]]; then
   fail "GET $web/login answered $(status_of "$login")"
 else
   pass "GET $web/login answered 200"
 fi
-if [[ $(header_of "$login" content-security-policy) == *"'nonce-"* ]]; then
-  pass '/login carries the nonce CSP'
-else
+nonce=$(header_of "$login" content-security-policy | sed -n "s/.*'nonce-\([^']*\)'.*/\1/p")
+if [[ -z $nonce ]]; then
   fail '/login has no nonce CSP'
+else
+  pass '/login carries the nonce CSP'
+  scripts=$(grep -o '<script[^>]*>' <<<"$login" || true)
+  total=$(grep -c . <<<"$scripts" || true)
+  with_nonce=$(grep -cF "nonce=\"$nonce\"" <<<"$scripts" || true)
+  if ((total > 0 && with_nonce == total)); then
+    pass "all $total <script> tags on /login carry the nonce"
+  else
+    fail "$with_nonce of $total <script> tags on /login carry the nonce"
+  fi
 fi
 if [[ -n $(header_of "$login" strict-transport-security) ]]; then
   pass '/login carries HSTS'
@@ -58,7 +68,7 @@ else
   fail '/login has no HSTS'
 fi
 
-home=$(fetch "$web/")
+home=$(fetch "$web/" "$WEB_TIMEOUT_S")
 location=$(header_of "$home" location)
 if [[ $(status_of "$home") == 30[78] && $location =~ ^(https://[^/]+)?/login([?]|$) ]]; then
   pass "GET $web/ without cookies redirects to /login"
@@ -66,7 +76,7 @@ else
   fail "GET $web/ answered $(status_of "$home") with location '${location}'"
 fi
 
-openapi=$(fetch "$web/api/docs/openapi.json")
+openapi=$(fetch "$web/api/docs/openapi.json" "$WEB_TIMEOUT_S")
 if [[ $(status_of "$openapi") == 200 && $(header_of "$openapi" content-type) == application/json* &&
   $openapi == *'"openapi":'* ]]; then
   pass "GET $web/api/docs/openapi.json reaches the API through the proxy"
@@ -74,7 +84,7 @@ else
   fail "GET $web/api/docs/openapi.json answered $(status_of "$openapi")"
 fi
 
-live=$(fetch "$api/health/live")
+live=$(fetch "$api/health/live" "$API_TIMEOUT_S")
 if [[ $(status_of "$live") != 200 ]]; then
   fail "GET $api/health/live answered $(status_of "$live")"
 elif [[ -n $commit && $live != *"\"version\":\"$commit\""* ]]; then
