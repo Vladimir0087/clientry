@@ -30,13 +30,13 @@ Filled in at setup. Names may carry a suffix where the plain one is taken.
 
 | What                 | Value                                                                                                |
 | -------------------- | ---------------------------------------------------------------------------------------------------- |
-| Web                  | `https://<site>.netlify.app`                                                                         |
-| Swagger UI           | `https://<site>.netlify.app/api/docs`                                                                |
+| Web                  | `https://clientry.netlify.app`                                                                       |
+| Swagger UI           | `https://clientry.netlify.app/api/docs`                                                              |
 | API probes           | `https://clientry-api.onrender.com/health/live`                                                      |
 | Render web service   | `clientry-api`                                                                                       |
 | Render Key Value     | `clientry-valkey`                                                                                    |
 | Neon project         | `clientry` (`little-math-93508455`), branch `production`, database `clientry`, role `clientry_owner` |
-| Netlify site         | `<site>` (`<site id>`), team on the legacy Free plan                                                 |
+| Netlify site         | `clientry` (`cfb430c6-8fbe-4e69-8c71-d7c45ef6b780`), team on the legacy Free plan                    |
 | Image                | `ghcr.io/vladimir0087/clientry-api` (private)                                                        |
 | UptimeRobot monitors | API liveness, web login                                                                              |
 | `TRUST_PROXY_HOPS`   | `<measured value>`, measured on `<date>`                                                             |
@@ -150,19 +150,22 @@ pauses every site when the month's credits run out.
 
    A taken name is refused; pick another. `id` is `NETLIFY_SITE_ID`, `ssl_url` the web origin.
 
-3. Project configuration → Build & deploy → Continuous deployment → Build settings: builds
-   **stopped**. Netlify then never builds by itself; CLI deploys still work.
+3. Project configuration → Build & deploy → Continuous deployment shows the repository as
+   **Not linked**. Netlify then has nothing to build by itself (it offers build settings only once
+   a repository is linked); only CLI deploys change the site.
 4. Project configuration → Environment variables, both **plain** (not "Contains secret values"),
    the same value in every deploy context, every scope. Neither is a secret, and `API_URL` is
    baked into the build output, which Netlify's secret scanning rejects for a secret variable.
    - `API_URL`: the Render origin, `https://clientry-api.onrender.com`, no trailing slash. Filled in
      after step 7, then redeployed.
    - `JWT_PUBLIC_KEY`: the public line from step 1, everything after `JWT_PUBLIC_KEY=`.
-5. Analytics, forms and snippet injection stay off: they would need CSP changes.
+5. Project configuration → General → **Powered by Netlify badge**: off. New Free projects get it
+   on, and its injected script carries no nonce, so the CSP blocks it and `smoke-live.sh` fails.
+   Analytics, forms and snippet injection stay off for the same reason.
 6. GitHub → Settings → Applications → Installed GitHub Apps: a Netlify app from earlier projects
    keeps access to "Only select repositories", never this one.
 
-The site's origin `https://<site>.netlify.app` is the web origin from now on.
+The site's origin `https://clientry.netlify.app` is the web origin from now on.
 
 ### 7. Render web service
 
@@ -178,15 +181,15 @@ New → Web Service → Existing image:
 
 Environment:
 
-| Variable           | Value                                             |
-| ------------------ | ------------------------------------------------- |
-| `NODE_ENV`         | `production`                                      |
-| `LOG_LEVEL`        | `info`                                            |
-| `DATABASE_URL`     | from step 2 (secret)                              |
-| `REDIS_URL`        | from step 3                                       |
-| `JWT_PRIVATE_KEY`  | the private line from step 1 (secret)             |
-| `TRUSTED_ORIGINS`  | `https://<site>.netlify.app`, the web origin only |
-| `TRUST_PROXY_HOPS` | `0` until [measured](#measure-trust_proxy_hops)   |
+| Variable           | Value                                               |
+| ------------------ | --------------------------------------------------- |
+| `NODE_ENV`         | `production`                                        |
+| `LOG_LEVEL`        | `info`                                              |
+| `DATABASE_URL`     | from step 2 (secret)                                |
+| `REDIS_URL`        | from step 3                                         |
+| `JWT_PRIVATE_KEY`  | the private line from step 1 (secret)               |
+| `TRUSTED_ORIGINS`  | `https://clientry.netlify.app`, the web origin only |
+| `TRUST_PROXY_HOPS` | `0` until [measured](#measure-trust_proxy_hops)     |
 
 `PORT` is Render's own and `APP_VERSION` is baked into the image; neither is set here.
 
@@ -207,7 +210,7 @@ is public).
 | `NETLIFY_AUTH_TOKEN`     | secret   | step 6                              |
 | `NETLIFY_SITE_ID`        | variable | step 6                              |
 | `API_PUBLIC_URL`         | variable | `https://clientry-api.onrender.com` |
-| `WEB_PUBLIC_URL`         | variable | `https://<site>.netlify.app`        |
+| `WEB_PUBLIC_URL`         | variable | `https://clientry.netlify.app`      |
 
 ### 9. First deploy
 
@@ -226,7 +229,7 @@ on both); their status is visible in the dashboard:
   workspace's single free web service. It is essential: Netlify stops a proxied call after 30 s,
   and a sleeping API takes about a minute to wake, so the first form submit after a sleep fails
   with "The server is waking up or busy";
-- `GET https://<site>.netlify.app/login`: shows whether the web is up.
+- `GET https://clientry.netlify.app/login`: shows whether the web is up.
 
 ### Measure `TRUST_PROXY_HOPS`
 
@@ -249,8 +252,8 @@ what it does to `X-Forwarded-For`, so the hops are measured; a host change means
    is still the machine's public address, not `203.0.113.9`.
 
    ```sh
-   curl --include --request POST https://<site>.netlify.app/api/auth/login \
-     --header 'Content-Type: application/json' --header 'Origin: https://<site>.netlify.app' \
+   curl --include --request POST https://clientry.netlify.app/api/auth/login \
+     --header 'Content-Type: application/json' --header 'Origin: https://clientry.netlify.app' \
      --header 'X-Forwarded-For: 203.0.113.9' \
      --data '{"email":"nobody@example.com","password":"wrong-password"}'
    ```
@@ -278,7 +281,7 @@ image. The manual run deploys the tested digest instead.
 ### Manual smoke check
 
 ```sh
-bash .github/scripts/smoke-live.sh https://<site>.netlify.app https://clientry-api.onrender.com [<commit>]
+bash .github/scripts/smoke-live.sh https://clientry.netlify.app https://clientry-api.onrender.com [<commit>]
 ```
 
 ### Rollback
@@ -294,7 +297,7 @@ bash .github/scripts/smoke-live.sh https://<site>.netlify.app https://clientry-a
 
 | Credential               | Where it lives                     | Expires    | Rotation                                                                                            |
 | ------------------------ | ---------------------------------- | ---------- | --------------------------------------------------------------------------------------------------- |
-| `NETLIFY_AUTH_TOKEN`     | GitHub secret                      | `<date>`   | new personal access token in Netlify, update the secret, delete the old token                       |
+| `NETLIFY_AUTH_TOKEN`     | GitHub secret                      | 2027-10-08 | new personal access token in Netlify, update the secret, delete the old token                       |
 | GHCR classic token       | Render registry credential         | 2027-10-08 | new `read:packages` token, update the credential, delete the old token                              |
 | `RENDER_DEPLOY_HOOK_URL` | GitHub secret                      | never      | regenerate in Render when it may have leaked, update the secret                                     |
 | JWT key pair             | Render (private), Netlify (public) | never      | new `jwt:keygen`, Render with Save only, Netlify, then a manual run; every user signs in again once |

@@ -47,6 +47,7 @@ apps/web/
   src/shared/lib/server-log.ts
   src/shared/lib/submit-error.ts         # the waking-up alert
   src/shared/api/api-status.ts           # isApiUnreachable
+  src/shared/config/env.ts               # the key's curve by its JWK name
   src/app/(app)/_lib/prefetch-session.ts # logs failures
 packages/shared/
   package.json                           # files
@@ -169,9 +170,12 @@ docs/specs/14-deploy-stage-2.md          # the web stays on Netlify
   rewrite) and one edge function for `proxy.ts`, which runs the Node-runtime proxy on Deno through
   the adapter's polyfills. A local `netlify build` and `netlify serve` on 2026-10-10 packaged both
   and put the response's nonce on every `<script>` tag; a signed-in request is first checked live.
+  That check found one gap: Deno names the P-256 curve `p256` where Node says `prime256v1`, so
+  the web's key check compares the curve's JWK name, `P-256`, which both runtimes share.
 - `next.config.ts` stays as it is. The rewrite's proxy timeout keeps Next's default of 30 s, which
   equals Netlify's limit for a synchronous function.
-- No Git connection and builds stopped in the site settings: production deploys come only from CI,
+- No Git connection, so Netlify has nothing to build by itself (its build settings appear only
+  once a repository is linked): production deploys come only from CI,
   and there are no deploy previews or branch deploys. Netlify's drawer is injected only into those,
   so the nonce CSP stays as it is.
 - HSTS: Netlify itself sends `Strict-Transport-Security: max-age=31536000; includeSubDomains;
@@ -253,8 +257,8 @@ Workflow `CI` runs on pull requests, on pushes to `main`, and by manual dispatch
   the site is locked. Migrations are forward-only, so a rolled-back API must still work with the
   migrated schema.
 - Platform auto-deploys are off: neither host is connected to the repository. The Render service
-  is image-backed; the Netlify site is created through Netlify's API without a repository, and its
-  builds are stopped.
+  is image-backed; the Netlify site is created through Netlify's API without a repository, so it
+  has nothing to build from.
 
 GitHub secrets and variables live at repo level: a private repo on the free plan has no
 environments. They move to a `production` environment once the repo is public (spec 13).
@@ -315,8 +319,9 @@ Free plans, checked on 2026-10-06 (the web on 2026-10-11):
     Neon refuses connections without TLS anyway, so migrations never run in plain text. Checked
     against the Prisma 7 connection URL reference at implementation time.
 - Netlify site: created without a repository (one request to Netlify's REST API with the personal
-  access token), so Netlify gets no access to it, like Render. Then in the panel: builds stopped;
-  the two variables below; analytics, forms and snippet injection left off (they would need CSP
+  access token), so Netlify gets no access to it, like Render. Then in the panel: the "Powered by
+  Netlify" badge off (new Free projects get it on, and Netlify injects its script without the
+  nonce, so the CSP would block it on every page); the two variables below; analytics, forms and snippet injection left off (they would need CSP
   changes). The account's GitHub App from earlier projects keeps access only to those
   repositories.
 - UptimeRobot: `GET <api>/health/live` every 5 minutes keeps the API awake without touching the
@@ -402,7 +407,7 @@ Free plans, checked on 2026-10-06 (the web on 2026-10-11):
     plan's 10 ms of CPU per request and 3 MB per worker do not fit a Next server), a second Render
     service (the pinged API already uses 744 of the workspace's 750 free hours) and a new Vercel
     account (it would sidestep Vercel's decision);
-  - CLI build and deploy in CI, with the site created through the API and builds stopped;
+  - CLI build and deploy in CI, with the site created through the API, without a repository;
   - Next's rewrite for `/api/*` kept, over Netlify's proxy rules: those time out after 26 s, and
     the adapter's catch-all function would likely be matched before them;
   - the consequences: functions in Ohio, a 30 s limit on a proxied call, the plan that must not
@@ -521,7 +526,7 @@ No new screens. The screens of spec 04 now run on the live host:
 - [ ] Neon, Render (service and Key Value), the GHCR credential, Netlify, GitHub secrets and
       variables, and UptimeRobot are set up as `docs/deployment.md` describes; every hosting
       variable of section 2 is set in its panel; `.env.example` is updated. Neither Render nor
-      Netlify is connected to the repository; the site's builds are stopped; both Netlify
+      Netlify is connected to the repository (the site shows "Not linked"); both Netlify
       variables are plain; the account is still on the legacy Free plan.
 - [ ] `DATABASE_URL` on Render ends in `?sslmode=verify-full&sslaccept=strict`; the API starts
       without pg's SSL deprecation warning, and `migrate deploy` in the Render deploy log connects

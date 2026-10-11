@@ -19,7 +19,7 @@ Everything else in ADR 0008 stays.
 - **Built and deployed by Netlify's CLI in CI.** `deploy-web` runs one `netlify deploy --prod`
   after `deploy-api`, with the CLI version pinned in the workflow and the Next adapter
   (`@netlify/plugin-nextjs`) pinned in the web's `package.json`. The site is created through
-  Netlify's REST API without a repository, and its builds are stopped.
+  Netlify's REST API without a repository, so Netlify has nothing to build by itself.
 - **The adapter's shape is accepted as it is.** Pages, route handlers and the rewrite run in one
   server function in Ohio, since a function region is a paid feature; `proxy.ts` runs as an edge
   function near the visitor, on Deno through the adapter's polyfills.

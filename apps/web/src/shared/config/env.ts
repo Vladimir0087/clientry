@@ -7,7 +7,8 @@ import { z } from 'zod';
 
 import { InvalidConfigError, parseOrigin } from '@clientry/shared/common';
 
-const P256_CURVE = 'prime256v1';
+// The JWK name: Node calls the curve prime256v1, Deno (the proxy on Netlify's edge) calls it p256.
+const P256_CURVE = 'P-256';
 const SPKI_HEADER = '-----BEGIN PUBLIC KEY-----';
 
 export interface WebEnv {
@@ -27,8 +28,7 @@ function parsePublicKey(value: string): KeyObject | undefined {
   } catch {
     return undefined;
   }
-  const isP256 =
-    key.asymmetricKeyType === 'ec' && key.asymmetricKeyDetails?.namedCurve === P256_CURVE;
+  const isP256 = key.asymmetricKeyType === 'ec' && key.export({ format: 'jwk' }).crv === P256_CURVE;
   return isP256 ? key : undefined;
 }
 
