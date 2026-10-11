@@ -39,7 +39,7 @@ Filled in at setup. Names may carry a suffix where the plain one is taken.
 | Netlify site         | `clientry` (`cfb430c6-8fbe-4e69-8c71-d7c45ef6b780`), team on the legacy Free plan                    |
 | Image                | `ghcr.io/vladimir0087/clientry-api` (private)                                                        |
 | UptimeRobot monitors | API liveness, web login                                                                              |
-| `TRUST_PROXY_HOPS`   | `<measured value>`, measured on `<date>`                                                             |
+| `TRUST_PROXY_HOPS`   | `5`, measured on 2026-10-11                                                                          |
 
 ## Consoles
 
@@ -242,7 +242,8 @@ what it does to `X-Forwarded-For`, so the hops are measured; a host change means
    `req.headers.x-forwarded-for` and `req.clientIp`.
 3. Count the addresses in `x-forwarded-for` from the browser's public address to the end, the
    browser's included. That count is the value: Express then takes the browser's address as the
-   client.
+   client. On 2026-10-11 the chain was the browser, Netlify's edge (Frankfurt), Netlify's function
+   (Ohio), Cloudflare in front of Render, and Render's own proxy: `5`.
 4. Set it in Render's environment with **Save only**, then redeploy through a manual CI run of the
    live branch (see [Redeploy](#redeploy-or-ship-a-changed-variable)).
 5. Log in again: `clientIp` must be the browser's public address. Ten wrong passwords within a

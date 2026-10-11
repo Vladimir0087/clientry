@@ -84,19 +84,19 @@ describe('serializeRequest', () => {
     expect(serialized.clientIp).toBe('198.51.100.23');
   });
 
-  it('should drop the geolocation headers when Vercel proxied the request', () => {
+  it('should drop the geolocation headers when Netlify proxied the request', () => {
     const request = standardSerialized({
       headers: {
-        'x-vercel-ip-city': 'Berlin',
-        'x-vercel-ip-latitude': '52.52',
-        'x-vercel-id': 'fra1::abc',
+        'x-nf-geo': 'eyJjaXR5IjoiQmVybGluIn0=',
+        'x-country': 'DE',
+        'x-nf-request-id': '01ABC',
         'x-forwarded-for': '198.51.100.23',
       },
     });
 
     const { headers } = serializeRequest(request);
 
-    expect(headers).toEqual({ 'x-vercel-id': 'fra1::abc', 'x-forwarded-for': '198.51.100.23' });
+    expect(headers).toEqual({ 'x-nf-request-id': '01ABC', 'x-forwarded-for': '198.51.100.23' });
   });
 
   it('should redact the cookie and authorization headers when the request is logged', () => {

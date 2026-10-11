@@ -5,8 +5,8 @@ import type { Options } from 'pino-http';
 import { pathWithoutQuery } from '../../common/http/request-path.js';
 
 const HEALTH_PATH_PREFIX = '/health/';
-// Vercel adds the visitor's city, region and coordinates to every proxied request.
-const GEOLOCATION_HEADER_PREFIX = 'x-vercel-ip-';
+// Netlify adds the visitor's country, and city, postal code and coordinates as base64 JSON.
+const GEOLOCATION_HEADERS = new Set(['x-country', 'x-nf-geo']);
 
 export function resolveRequestLogLevel(
   request: Request,
@@ -53,7 +53,7 @@ function withoutGeolocation(
   headers: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> {
   return Object.fromEntries(
-    Object.entries(headers).filter(([name]) => !name.startsWith(GEOLOCATION_HEADER_PREFIX)),
+    Object.entries(headers).filter(([name]) => !GEOLOCATION_HEADERS.has(name)),
   );
 }
 

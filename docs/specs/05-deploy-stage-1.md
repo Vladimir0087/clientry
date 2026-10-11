@@ -146,10 +146,10 @@ docs/specs/14-deploy-stage-2.md          # the web stays on Netlify
 - Request log lines:
   - gain `clientIp`, `req.ip` as Express resolves it with `trust proxy`, so `TRUST_PROXY_HOPS` is
     checked by reading one line;
-  - drop the geolocation headers the web's host forwards (a visitor's city, region or
-    coordinates), which the log has no use for; `x-forwarded-for` and the host's request id stay.
-    Netlify does not document which headers its functions receive, so the list comes from the
-    first live request log behind Netlify; if none arrive, the filter goes.
+  - drop the geolocation headers the web's host forwards, which the log has no use for. Netlify
+    does not document them; the first live request log behind it showed `x-nf-geo` (base64 JSON
+    with the visitor's city, postal code and coordinates) and `x-country`. `x-forwarded-for`,
+    `x-nf-client-connection-ip` and `x-nf-request-id` stay.
 
 **Web changes**
 
@@ -480,9 +480,8 @@ No new screens. The screens of spec 04 now run on the live host:
     10 s, connection string from config.
   - Redis client options: command timeout 2 s; the other options as before.
   - Health service: liveness returns the configured version.
-  - Request serializer: `clientIp` from `req.ip`; the geolocation headers seen behind Netlify
-    dropped, if any arrive; the host's request id and `x-forwarded-for` kept; `cookie` and
-    `authorization` still redacted.
+  - Request serializer: `clientIp` from `req.ip`; `x-nf-geo` and `x-country` dropped;
+    `x-nf-request-id` and `x-forwarded-for` kept; `cookie` and `authorization` still redacted.
 - **Integration, apps/api**
   - `/health/live` → 200 with the version from the test config.
   - `SHOW statement_timeout` through the app's Prisma client → `10s`.
