@@ -179,13 +179,13 @@ docs/specs/14-deploy-stage-2.md          # the web stays on Netlify
 - `next.config.ts` stays as it is. The rewrite's proxy timeout keeps Next's default of 30 s, which
   equals Netlify's limit for a synchronous function.
 - No Git connection, so Netlify has nothing to build by itself (its build settings appear only
-  once a repository is linked): production deploys come only from CI,
-  and there are no deploy previews or branch deploys. Netlify's drawer is injected only into those,
-  so the nonce CSP stays as it is.
-- HSTS: Netlify itself sends `Strict-Transport-Security: max-age=31536000; includeSubDomains;
-preload` on `*.netlify.app` (seen on another site on 2026-10-10). Nothing in `next.config.ts`
-  while the first deploy shows it there; if it does not, the same header joins the security
-  headers in `next.config.ts`. `smoke-live.sh` fails on every deploy if it goes missing.
+  once a repository is linked): production deploys come only from CI, and there are no deploy
+  previews or branch deploys. Netlify's drawer is injected only into those, so the nonce CSP stays
+  as it is.
+- HSTS: Netlify itself sends
+  `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` on `*.netlify.app`,
+  this site included (seen on 2026-10-11), so `next.config.ts` does not set it. `smoke-live.sh`
+  fails on every deploy if it goes missing.
 - The web's `turbo.json` loses the Vercel pass-through and keeps its env list: the local Netlify
   build produced the adapter's standalone output in strict env mode without any change.
 
@@ -325,9 +325,9 @@ Free plans, checked on 2026-10-06 (the web on 2026-10-11):
 - Netlify site: created without a repository (one request to Netlify's REST API with the personal
   access token), so Netlify gets no access to it, like Render. Then in the panel: the "Powered by
   Netlify" badge off (new Free projects get it on, and Netlify injects its script without the
-  nonce, so the CSP would block it on every page); the two variables below; analytics, forms and snippet injection left off (they would need CSP
-  changes). The account's GitHub App from earlier projects keeps access only to those
-  repositories.
+  nonce, so the CSP would block it on every page); the two variables below; analytics, forms and
+  snippet injection left off (they would need CSP changes). The account's GitHub App from earlier
+  projects keeps access only to those repositories.
 - UptimeRobot: `GET <api>/health/live` every 5 minutes keeps the API awake without touching the
   database. 31 days × 24 h = 744 h fits the 750 h only while it is the workspace's single free
   web service. A second monitor on `GET <web>/login` shows the web's status in the dashboard. No
@@ -497,6 +497,8 @@ No new screens. The screens of spec 04 now run on the live host:
     connection and a body off the schema → exactly one `warn` line each with the matching `reason`,
     plus `status`, `code` and `requestId` for HTTP; success and an `expired` cookie → no line; the
     cookie value never appears. The existing prefetch tests stay.
+  - Web env: an EC key on a curve without a JWK name (`secp224r1`) → the `JWT_PUBLIC_KEY` config
+    error, like the P-384 and RSA keys.
 - **Unit, apps/web (jsdom)**
   - Unexpected alert: a 504 without problem details → the waking-up message without a reference;
     the API's own 500 → the generic message with its request id; a 404 without problem details →

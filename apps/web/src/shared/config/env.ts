@@ -22,14 +22,15 @@ function parsePublicKey(value: string): KeyObject | undefined {
   if (!pem.startsWith(SPKI_HEADER)) {
     return undefined;
   }
-  let key: KeyObject;
   try {
-    key = createPublicKey({ key: pem, format: 'pem' });
+    const key = createPublicKey({ key: pem, format: 'pem' });
+    // The JWK export throws for a curve that has no JWK name.
+    const isP256 =
+      key.asymmetricKeyType === 'ec' && key.export({ format: 'jwk' }).crv === P256_CURVE;
+    return isP256 ? key : undefined;
   } catch {
     return undefined;
   }
-  const isP256 = key.asymmetricKeyType === 'ec' && key.export({ format: 'jwk' }).crv === P256_CURVE;
-  return isP256 ? key : undefined;
 }
 
 // Issues never quote the input: the key and the address are deployment details.
