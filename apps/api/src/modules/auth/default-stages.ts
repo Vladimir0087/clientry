@@ -1,4 +1,4 @@
-export type StageKind = 'open' | 'won' | 'lost';
+import type { StageKind } from '@clientry/shared/deals';
 
 export interface DefaultStage {
   readonly name: string;

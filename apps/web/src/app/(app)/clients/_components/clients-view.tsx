@@ -20,9 +20,12 @@ import type { ClientFiltersState } from '@/features/client-filters';
 import { Button } from '@/shared/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/shared/ui/empty';
 import { PageHeading } from '@/shared/ui/page-heading';
+import { RetryMessage } from '@/shared/ui/retry-message';
 import { Spinner } from '@/shared/ui/spinner';
 
 type ClientListQuery = UseInfiniteQueryResult<ClientListData>;
+
+const HEADING_ID = 'clients-heading';
 
 // Both layouts hold a link per row and CSS hides one; focus lands on the one that can take it.
 function focusRow(container: HTMLElement | null, index: number): void {
@@ -165,12 +168,11 @@ function ListBody({ list, state, onClear }: ListBodyProps): React.JSX.Element {
         void list.refetch();
       };
       return (
-        <div className="flex flex-col items-start gap-3">
-          <p>We could not load clients.</p>
-          <Button variant="outline" onClick={handleRetry}>
-            Try again
-          </Button>
-        </div>
+        <RetryMessage
+          message="We could not load clients."
+          focusTargetId={HEADING_ID}
+          onRetry={handleRetry}
+        />
       );
     }
     return <ClientListSkeleton />;
@@ -203,7 +205,7 @@ export function ClientsView(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeading>Clients</PageHeading>
+        <PageHeading id={HEADING_ID}>Clients</PageHeading>
         <NewClientButton />
       </div>
       <ClientFiltersToolbar state={state} searchRef={searchRef} onClear={handleClear} />

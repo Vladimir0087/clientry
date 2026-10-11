@@ -1,13 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useId } from 'react';
 import type * as React from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 
-import { ClientNotFound, clientPath, isNotFound, useClient } from '@/entities/client';
+import { ClientNotFound, clientPath, useClient } from '@/entities/client';
+import { isNotFound } from '@/shared/api/api-status';
 import { requestHeadingFocus } from '@/shared/lib/heading-focus';
-import { Button } from '@/shared/ui/button';
 import { PageHeading } from '@/shared/ui/page-heading';
+import { RetryMessage } from '@/shared/ui/retry-message';
 import type { Client } from '@clientry/shared/clients';
 
 import { ClientForm } from './client-form';
@@ -42,7 +44,12 @@ function LoadedEditForm({ client }: { readonly client: Client }): React.JSX.Elem
   );
 }
 
-function EditState({ id }: { readonly id: string }): React.JSX.Element {
+interface EditStateProps {
+  readonly id: string;
+  readonly headingId: string;
+}
+
+function EditState({ id, headingId }: EditStateProps): React.JSX.Element {
   const client = useClient(id);
   if (client.data !== undefined) {
     return <LoadedEditForm client={client.data} />;
@@ -51,28 +58,33 @@ function EditState({ id }: { readonly id: string }): React.JSX.Element {
     return <ClientFormSkeleton />;
   }
   const handleRetry = (): void => {
-    void client.refetch();
+    void client.refetch().then((result) => {
+      // A client gone meanwhile swaps the heading Try again focused for the not found state's.
+      if (isNotFound(result.error) && document.activeElement?.id === headingId) {
+        requestHeadingFocus();
+      }
+    });
   };
   return (
-    <div className="flex flex-col items-start gap-3">
-      <p>We could not load the client.</p>
-      <Button variant="outline" onClick={handleRetry}>
-        Try again
-      </Button>
-    </div>
+    <RetryMessage
+      message="We could not load the client."
+      focusTargetId={headingId}
+      onRetry={handleRetry}
+    />
   );
 }
 
 // A client that is gone shows the card's not found state, which brings its own heading.
 export function EditClientForm({ id }: { readonly id: string }): React.JSX.Element {
   const client = useClient(id);
+  const headingId = useId();
   if (isNotFound(client.error)) {
     return <ClientNotFound />;
   }
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading>Edit client</PageHeading>
-      <EditState id={id} />
+      <PageHeading id={headingId}>Edit client</PageHeading>
+      <EditState id={id} headingId={headingId} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ interface SubmitButtonProps {
   readonly isSubmitting: boolean;
   readonly isDisabled?: boolean;
   readonly className?: string;
+  readonly onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
   readonly children: React.ReactNode;
 }
 
@@ -15,10 +16,17 @@ export function SubmitButton({
   isSubmitting,
   isDisabled = false,
   className,
+  onKeyDown,
   children,
 }: SubmitButtonProps): React.JSX.Element {
   return (
-    <Button type="submit" size="lg" className={className} disabled={isSubmitting || isDisabled}>
+    <Button
+      type="submit"
+      size="lg"
+      className={className}
+      disabled={isSubmitting || isDisabled}
+      onKeyDown={onKeyDown}
+    >
       {isSubmitting && <Spinner data-icon="inline-start" aria-hidden="true" />}
       {children}
     </Button>

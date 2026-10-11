@@ -38,24 +38,15 @@ import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { UntrustedOriginError } from '../../common/guards/untrusted-origin.error.js';
 import {
   ApiErrorResponse,
+  ApiInvalidRequest,
   ApiUntrustedOrigin,
 } from '../../common/http/api-error-response.decorator.js';
-import { ApiProblemResponse } from '../../common/http/api-problem-response.decorator.js';
 import { ResponseSchema } from '../../common/http/response-schema.decorator.js';
 import { AuthenticationRequiredError } from '../auth/errors.js';
 
 const COLLECTION = '/api/clients';
 const ITEM = '/api/clients/0199a3c4-7d10-7c2e-9a4b-5c6d7e8f9a0b';
 const RESTORE = `${ITEM}/restore`;
-
-function ApiInvalidRequest(instance: string, path: string, message: string): MethodDecorator {
-  return ApiProblemResponse(HttpStatus.BAD_REQUEST, {
-    code: 'VALIDATION_FAILED',
-    detail: 'Request validation failed',
-    instance,
-    errors: [{ path, message }],
-  });
-}
 
 function ApiClientNotFound(instance: string): MethodDecorator {
   return ApiErrorResponse(HttpStatus.NOT_FOUND, instance, new ClientNotFoundError());

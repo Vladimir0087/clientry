@@ -14,7 +14,9 @@ import { AccessTokenGuard } from './modules/auth/access-token.guard.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { RolesGuard } from './modules/auth/roles.guard.js';
 import { ClientsModule } from './modules/clients/clients.module.js';
+import { DealsModule } from './modules/deals/deals.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { WorkspacesModule } from './modules/workspaces/workspaces.module.js';
 
 export interface AppModuleOptions {
   readonly config: AppConfig;
@@ -31,7 +33,9 @@ export class AppModule {
         AppLoggerModule.forRoot(logger),
         AuthModule,
         ClientsModule,
+        DealsModule,
         HealthModule,
+        WorkspacesModule,
       ],
       providers: [
         // Global guards run in this order: CSRF check, authentication, role.

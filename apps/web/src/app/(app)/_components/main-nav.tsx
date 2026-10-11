@@ -7,13 +7,17 @@ import { usePathname } from 'next/navigation';
 import type * as React from 'react';
 
 import { CLIENTS_PATH } from '@/entities/client';
+import { DEALS_PATH } from '@/entities/deal';
 
 interface NavItem {
   readonly href: Route;
   readonly label: string;
 }
 
-const NAV_ITEMS: readonly NavItem[] = [{ href: CLIENTS_PATH, label: 'Clients' }];
+const NAV_ITEMS: readonly NavItem[] = [
+  { href: CLIENTS_PATH, label: 'Clients' },
+  { href: DEALS_PATH, label: 'Deals' },
+];
 
 function isCurrent(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);

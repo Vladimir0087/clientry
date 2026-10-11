@@ -3,7 +3,7 @@ import type { HttpResponseResolver } from 'msw';
 
 import { server } from './server';
 
-type Method = 'get' | 'post' | 'patch' | 'delete';
+type Method = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 export type Resolver = (info: Parameters<HttpResponseResolver>[0]) => Response | Promise<Response>;
 

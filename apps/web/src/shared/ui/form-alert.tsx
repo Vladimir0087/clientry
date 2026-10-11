@@ -5,6 +5,7 @@ import type * as React from 'react';
 
 import type { FormAlertContent } from '@/shared/lib/submit-error';
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert';
+import { Button } from '@/shared/ui/button';
 
 // The select trigger is a button with the combobox role.
 function isFormControl(element: Element | null): boolean {
@@ -39,6 +40,13 @@ export function FormAlert({ alert }: FormAlertProps): React.JSX.Element | null {
       <AlertTitle>{alert.message}</AlertTitle>
       {alert.reference !== undefined && (
         <AlertDescription>Reference: {alert.reference}</AlertDescription>
+      )}
+      {alert.action !== undefined && (
+        <AlertDescription>
+          <Button type="button" variant="outline" size="sm" onClick={alert.action.onClick}>
+            {alert.action.label}
+          </Button>
+        </AlertDescription>
       )}
       {alert.link !== undefined && (
         <AlertDescription>

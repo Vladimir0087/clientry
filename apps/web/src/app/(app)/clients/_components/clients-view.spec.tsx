@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ClientsView } from './clients-view';
 import { clientPage, makeClient } from '../../../../../test/clients';
+import { failOnceThenWait } from '../../../../../test/msw/fail-once';
 import { problemResponse } from '../../../../../test/msw/problem';
 import { recordRequests } from '../../../../../test/msw/record';
 import type { Resolver } from '../../../../../test/msw/record';
@@ -104,6 +105,16 @@ describe('ClientsView', () => {
 
     expect(await screen.findByRole('table')).toBeInTheDocument();
     expect(requests).toHaveLength(2);
+  });
+
+  it('should focus the Clients heading when Try again reloads the list', async () => {
+    answerList(failOnceThenWait(clientPage(FIRST_PAGE)));
+    renderWithUrl(<ClientsView />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByTestId('client-list-skeleton')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Clients' })).toHaveFocus();
   });
 
   it('should append the next page and keep focus on Load more when more pages remain', async () => {

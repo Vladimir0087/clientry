@@ -11,6 +11,7 @@ import { CreateClientForm } from './create-client-form';
 import { EditClientForm } from './edit-client-form';
 import { TEST_CLIENT } from '../../../../test/clients';
 import { mockRouter } from '../../../../test/mocks/router';
+import { failOnceThenAnswer, failOnceThenWait } from '../../../../test/msw/fail-once';
 import { problemResponse } from '../../../../test/msw/problem';
 import { recordRequests } from '../../../../test/msw/record';
 import type { Resolver } from '../../../../test/msw/record';
@@ -169,6 +170,31 @@ describe('client form', () => {
   });
 
   describe('edit', () => {
+    it('should focus the Edit client heading when Try again reloads the client', async () => {
+      recordRequests('get', `/api/clients/${TEST_CLIENT.id}`, failOnceThenWait(TEST_CLIENT));
+      renderWithProviders(<EditClientForm id={TEST_CLIENT.id} />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+      expect(await screen.findByTestId('client-form-skeleton')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Edit client' })).toHaveFocus();
+    });
+
+    it('should focus the not found heading when Try again finds the client deleted', async () => {
+      recordRequests(
+        'get',
+        `/api/clients/${TEST_CLIENT.id}`,
+        failOnceThenAnswer(() => problemResponse(404, 'CLIENT_NOT_FOUND')),
+      );
+      renderWithProviders(<EditClientForm id={TEST_CLIENT.id} />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { level: 1, name: 'Client not found' })).toHaveFocus();
+      });
+    });
+
     it('should keep Save changes disabled until a field changes', async () => {
       const user = userEvent.setup();
       renderEdit();
