@@ -48,6 +48,7 @@ apps/web/
   src/shared/lib/submit-error.ts         # the waking-up alert
   src/shared/api/api-status.ts           # isApiUnreachable
   src/shared/config/env.ts               # the key's curve by its JWK name
+  src/shared/api/browser-client.ts       # no second refresh for a late 401
   src/app/(app)/_lib/prefetch-session.ts # logs failures
 packages/shared/
   package.json                           # files
@@ -172,6 +173,9 @@ docs/specs/14-deploy-stage-2.md          # the web stays on Netlify
   and put the response's nonce on every `<script>` tag; a signed-in request is first checked live.
   That check found one gap: Deno names the P-256 curve `p256` where Node says `prime256v1`, so
   the web's key check compares the curve's JWK name, `P-256`, which both runtimes share.
+- The browser client counts finished refreshes. A 401 for a request sent before the latest refresh
+  finished only retries: behind the functions in Ohio, the first live idle check saw such a 401
+  land after the shared refresh and start a second one.
 - `next.config.ts` stays as it is. The rewrite's proxy timeout keeps Next's default of 30 s, which
   equals Netlify's limit for a synchronous function.
 - No Git connection, so Netlify has nothing to build by itself (its build settings appear only
@@ -498,6 +502,8 @@ No new screens. The screens of spec 04 now run on the live host:
     the API's own 500 → the generic message with its request id; a 404 without problem details →
     the generic message.
   - Login form: an HTML 502 from MSW → the waking-up alert without a reference.
+  - API client: two requests with the old token, the second 401 slower than the refresh → one
+    refresh, both succeed.
 - **Container**: `smoke-api-container.sh` in the `image` job, as in section 2.
 - **Live**: `wait-for-api-version.sh` and `smoke-live.sh` on every deploy, as in section 2.
 - **e2e**: none (spec 12). The live checks of section 7 are done by hand and with

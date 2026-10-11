@@ -210,6 +210,36 @@ describe('apiRequest', () => {
     expect(counts.refresh).toBe(0);
   });
 
+  it('should retry without a second refresh when a 401 for the old token lands after the refresh', async () => {
+    let isRefreshed = false;
+    let expiredRequests = 0;
+    let refreshes = 0;
+    server.use(
+      http.get(`*${ME}`, async () => {
+        if (isRefreshed) {
+          return HttpResponse.json(TEST_SESSION);
+        }
+        expiredRequests += 1;
+        // The second request carried the old token too, but its 401 is slow to come back.
+        if (expiredRequests === 2) {
+          await delay(REFRESH_DELAY_MS * 5);
+        }
+        return problemResponse(401, 'AUTHENTICATION_REQUIRED');
+      }),
+      http.post('*/api/auth/refresh', async () => {
+        refreshes += 1;
+        await delay(REFRESH_DELAY_MS);
+        isRefreshed = true;
+        return HttpResponse.json(TEST_SESSION);
+      }),
+    );
+
+    const sessions = await Promise.all([getSession(), getSession()]);
+
+    expect(sessions).toEqual([TEST_SESSION, TEST_SESSION]);
+    expect(refreshes).toBe(1);
+  });
+
   it('should start a new refresh when a 401 comes after the previous refresh finished', async () => {
     const counts = expiringSession(undefined, { isStuck: true });
     await getSession().catch(() => undefined);
