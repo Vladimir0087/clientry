@@ -7,7 +7,7 @@ import { LOGIN_PATH } from '@/shared/lib/redirect-target';
 
 import { ShellHeader } from './_components/shell-header';
 import { getPrefetchRequest } from './_lib/access-session';
-import { prefetchSession } from './_lib/prefetch';
+import { prefetchSession, prefetchUnreadCount } from './_lib/prefetch';
 
 const MAIN_ID = 'main';
 
@@ -22,7 +22,10 @@ export default async function AppLayout({ children }: AppLayoutProps): Promise<R
     redirect(LOGIN_PATH);
   }
   const queryClient = createQueryClient();
-  await prefetchSession(queryClient, request);
+  await Promise.all([
+    prefetchSession(queryClient, request),
+    prefetchUnreadCount(queryClient, request),
+  ]);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <a

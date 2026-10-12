@@ -27,6 +27,14 @@
       "types": "./dist/health/index.d.ts",
       "default": "./dist/health/index.js"
     },
+    "./notifications": {
+      "types": "./dist/notifications/index.d.ts",
+      "default": "./dist/notifications/index.js"
+    },
+    "./tasks": {
+      "types": "./dist/tasks/index.d.ts",
+      "default": "./dist/tasks/index.js"
+    },
     "./workspaces": {
       "types": "./dist/workspaces/index.d.ts",
       "default": "./dist/workspaces/index.js"

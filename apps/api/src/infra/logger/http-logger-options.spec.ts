@@ -1,8 +1,13 @@
 import type { Request, Response } from 'express';
+import { pinoHttp } from 'pino-http';
 import { describe, expect, it } from 'vitest';
 
 import { createLogger } from './create-logger.js';
-import { resolveRequestLogLevel, serializeRequest } from './http-logger-options.js';
+import {
+  createHttpLoggerOptions,
+  resolveRequestLogLevel,
+  serializeRequest,
+} from './http-logger-options.js';
 import type { SerializedRequest } from './http-logger-options.js';
 import { createUnitConfig } from '../../../test/support/unit-config.js';
 
@@ -110,5 +115,23 @@ describe('serializeRequest', () => {
       headers: { cookie: '[REDACTED]', authorization: '[REDACTED]' },
     });
     expect(JSON.stringify(entry)).not.toMatch(/s3cret/);
+  });
+});
+
+describe('createHttpLoggerOptions', () => {
+  it('should leave out the command arguments when a request logs a Redis reply error', () => {
+    const lines: string[] = [];
+    const logger = createLogger(createUnitConfig({ LOG_LEVEL: 'info' }), {
+      write: (line) => lines.push(line),
+    });
+    const requestLogger = pinoHttp(createHttpLoggerOptions(logger)).logger;
+    const error = Object.assign(new Error('OOM command not allowed'), {
+      command: { name: 'evalsha', args: ['{"remindAt":"2026-10-15T06:00:00.000Z"}'] },
+    });
+
+    requestLogger.warn({ err: error }, 'Could not queue a reminder');
+
+    expect(lines.join('')).toMatch(/OOM command not allowed/);
+    expect(lines.join('')).not.toMatch(/evalsha|remindAt/);
   });
 });

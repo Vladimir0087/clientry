@@ -3,6 +3,7 @@ import type { QueryClient, UseMutationResult } from '@tanstack/react-query';
 
 import { clientKeys, createClient, updateClient } from '@/entities/client';
 import { dealKeys } from '@/entities/deal';
+import { taskKeys } from '@/entities/task';
 import type { Client, CreateClientRequest, UpdateClientRequest } from '@clientry/shared/clients';
 
 interface UpdateVariables {
@@ -18,10 +19,11 @@ function storeSavedClient(queryClient: QueryClient, client: Client): void {
   void queryClient.invalidateQueries({ queryKey: clientKeys.tags, refetchType: 'none' });
 }
 
-// Deal cards and lists show the client's name.
+// Deal cards, lists and task rows show the client's name.
 function storeEditedClient(queryClient: QueryClient, client: Client): void {
   storeSavedClient(queryClient, client);
   void queryClient.invalidateQueries({ queryKey: dealKeys.all });
+  void queryClient.invalidateQueries({ queryKey: taskKeys.all });
 }
 
 export function useCreateClient(): UseMutationResult<Client, Error, CreateClientRequest> {

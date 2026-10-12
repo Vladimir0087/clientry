@@ -4,6 +4,8 @@ import { HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
 import { clientKeys } from '@/entities/client';
+import { taskKeys } from '@/entities/task';
+import type { TaskFilters } from '@/entities/task';
 import { createQueryClient } from '@/shared/api/query-client';
 import { PageHeading } from '@/shared/ui/page-heading';
 
@@ -18,6 +20,8 @@ import type { Resolver } from '../../../../test/msw/record';
 import { renderWithProviders } from '../../../../test/render';
 
 const CARD_PATH = `/clients/${TEST_CLIENT.id}`;
+const OPEN_TASKS: TaskFilters = { isMine: true, status: 'open' };
+const NO_TASKS = { pages: [{ items: [], nextCursor: null }], pageParams: [null] };
 
 function answerCreate(resolver: Resolver): Request[] {
   return recordRequests('post', '/api/clients', resolver);
@@ -219,6 +223,20 @@ describe('client form', () => {
         expect(mockRouter.replace).toHaveBeenCalledWith(CARD_PATH);
       });
       expect(await bodyOf(requests[0])).toEqual({ phone: '', tags: ['landing'] });
+    });
+
+    it('should mark the tasks stale when the client is saved', async () => {
+      answerUpdate(() => HttpResponse.json(TEST_CLIENT));
+      const user = userEvent.setup();
+      const { queryClient } = renderEdit();
+      queryClient.setQueryData(taskKeys.list(OPEN_TASKS), NO_TASKS);
+
+      await user.type(screen.getByLabelText('Company'), ' Group');
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() => {
+        expect(queryClient.getQueryState(taskKeys.list(OPEN_TASKS))?.isInvalidated).toBe(true);
+      });
     });
 
     it('should say the client no longer exists when the save answers 404', async () => {

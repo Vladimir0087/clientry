@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { dealKeys, DEALS_PATH, deleteDeal, stageKeys } from '@/entities/deal';
+import { taskKeys } from '@/entities/task';
 import { isNotFound } from '@/shared/api/api-status';
 import { requestHeadingFocus } from '@/shared/lib/heading-focus';
 import type { Deal } from '@clientry/shared/deals';
@@ -30,6 +31,8 @@ export function useDeleteDeal(): UseMutationResult<void, Error, DeletedDeal> {
     // Every client's list: the page's deal may name a client it has since been moved from.
     void queryClient.invalidateQueries({ queryKey: dealKeys.clientLists });
     void queryClient.invalidateQueries({ queryKey: dealKeys.detail(id), refetchType: 'none' });
+    // The deal's tasks are hidden with it; only marked stale, as the page is leaving.
+    void queryClient.invalidateQueries({ queryKey: taskKeys.all, refetchType: 'none' });
   };
 
   return useMutation({

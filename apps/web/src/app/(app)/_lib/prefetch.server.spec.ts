@@ -6,9 +6,12 @@ import type { MockInstance } from 'vitest';
 import { clientKeys, normalizeClientFilters } from '@/entities/client';
 import { dealKeys, stageKeys } from '@/entities/deal';
 import { memberKeys } from '@/entities/member';
+import { notificationKeys } from '@/entities/notification';
 import { sessionKeys } from '@/entities/session';
+import { taskKeys } from '@/entities/task';
 import { loadClientFilters } from '@/features/client-filters';
 import { loadBoardFilters } from '@/features/deal-filters';
+import { loadTaskFilters } from '@/features/task-filters';
 import { createQueryClient } from '@/shared/api/query-client';
 import type { CookieReader } from '@/shared/api/server-client';
 import { verifyAccessToken } from '@/shared/lib/verify-access-token';
@@ -24,13 +27,18 @@ import {
   prefetchMembers,
   prefetchSession,
   prefetchStages,
+  prefetchTask,
+  prefetchTaskList,
+  prefetchUnreadCount,
 } from './prefetch';
 import type { PrefetchRequest } from './prefetch';
+import { taskSectionFilters } from './task-section-filters';
 import { TEST_CLIENT, TEST_CLIENT_LIST } from '../../../../test/clients';
 import { makeBoard, TEST_DEAL, TEST_MEMBERS, TEST_STAGES } from '../../../../test/deals';
 import { TEST_SESSION } from '../../../../test/fixtures';
 import { problemResponse } from '../../../../test/msw/problem';
 import { server } from '../../../../test/msw/server';
+import { makeTaskPage, TEST_TASK } from '../../../../test/tasks';
 import { createAccessToken } from '../../../../test/tokens';
 
 const TIME_LIMIT_MS = 1000;
@@ -315,6 +323,86 @@ describe('prefetch', () => {
         createQueryClient(),
         await requestWith(await createAccessToken()),
         TEST_DEAL.id,
+      );
+
+      expect(counter.count).toBe(1);
+      expect(writtenLines()).toEqual([]);
+    });
+  });
+
+  describe('tasks', () => {
+    const page = makeTaskPage([TEST_TASK]);
+
+    function asInfinite(data: unknown): unknown {
+      return { pages: [data], pageParams: [null] };
+    }
+
+    it('should fill the key the client hook builds when the URL has assignee=anyone and status=done', async () => {
+      const counter = countRequests('/api/tasks', () => HttpResponse.json(page));
+      const queryClient = createQueryClient();
+      const filters = await loadTaskFilters(
+        Promise.resolve({ assignee: 'anyone', status: 'done' }),
+      );
+
+      await prefetchTaskList(queryClient, await requestWith(await createAccessToken()), filters);
+
+      const key = taskKeys.list({ isMine: false, status: 'done' });
+      expect(queryClient.getQueryData(key)).toEqual(asInfinite(page));
+      expect(counter.urls.map((url) => new URL(url).search)).toEqual(['?status=done']);
+    });
+
+    it('should ask for my open tasks when the URL has no filters', async () => {
+      const counter = countRequests('/api/tasks', () => HttpResponse.json(page));
+      const queryClient = createQueryClient();
+
+      await prefetchTaskList(
+        queryClient,
+        await requestWith(await createAccessToken()),
+        await loadTaskFilters({}),
+      );
+
+      expect(queryClient.getQueryData(taskKeys.list({ isMine: true, status: 'open' }))).toEqual(
+        asInfinite(page),
+      );
+      expect(counter.urls.map((url) => new URL(url).search)).toEqual(['?assignee=me']);
+    });
+
+    it('should fill the keys the sections, the task page and the bell read when every query answers 200', async () => {
+      const counter = countRequests('/api/tasks', () => HttpResponse.json(page));
+      countRequests(`/api/tasks/${TEST_TASK.id}`, () => HttpResponse.json(TEST_TASK));
+      countRequests('/api/notifications/unread-count', () => HttpResponse.json({ count: 3 }));
+      const queryClient = createQueryClient();
+      const request = await requestWith(await createAccessToken());
+      const clientTasks = taskSectionFilters({ clientId: TEST_CLIENT.id });
+      const dealTasks = taskSectionFilters({ dealId: TEST_DEAL.id });
+
+      await Promise.all([
+        prefetchTaskList(queryClient, request, clientTasks),
+        prefetchTaskList(queryClient, request, dealTasks),
+        prefetchTask(queryClient, request, TEST_TASK.id),
+        prefetchUnreadCount(queryClient, request),
+      ]);
+
+      expect(queryClient.getQueryData(taskKeys.list(clientTasks))).toEqual(asInfinite(page));
+      expect(queryClient.getQueryData(taskKeys.list(dealTasks))).toEqual(asInfinite(page));
+      expect(queryClient.getQueryData(taskKeys.detail(TEST_TASK.id))).toEqual(TEST_TASK);
+      expect(queryClient.getQueryData(notificationKeys.unreadCount)).toEqual({ count: 3 });
+      expect(counter.urls.map((url) => new URL(url).search).toSorted()).toEqual([
+        `?clientId=${TEST_CLIENT.id}`,
+        `?dealId=${TEST_DEAL.id}`,
+      ]);
+      expect(writtenLines()).toEqual([]);
+    });
+
+    it('should log nothing when the task is not found', async () => {
+      const counter = countRequests(`/api/tasks/${TEST_TASK.id}`, () =>
+        problemResponse(404, 'TASK_NOT_FOUND'),
+      );
+
+      await prefetchTask(
+        createQueryClient(),
+        await requestWith(await createAccessToken()),
+        TEST_TASK.id,
       );
 
       expect(counter.count).toBe(1);

@@ -4,7 +4,6 @@ import { ChevronsUpDownIcon } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import type * as React from 'react';
 
-import { useClientSearch } from '@/entities/client';
 import { useDebouncedValue } from '@/shared/lib/use-debounced-value';
 import { Button } from '@/shared/ui/button';
 import { Command, CommandInput, CommandItem, CommandList } from '@/shared/ui/command';
@@ -14,6 +13,8 @@ import { RetryMessage } from '@/shared/ui/retry-message';
 import { Spinner } from '@/shared/ui/spinner';
 import { CLIENT_LIMITS } from '@clientry/shared/clients';
 import type { ClientSummary } from '@clientry/shared/clients';
+
+import { useClientSearch } from '../model/use-client-search';
 
 const CLIENT_SEARCH_DELAY_MS = 300;
 

@@ -4,6 +4,8 @@ import { delay, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
 import { dealKeys, stageKeys } from '@/entities/deal';
+import { taskKeys } from '@/entities/task';
+import type { TaskFilters } from '@/entities/task';
 import { createQueryClient } from '@/shared/api/query-client';
 import { PageHeading } from '@/shared/ui/page-heading';
 
@@ -23,6 +25,8 @@ type User = ReturnType<typeof userEvent.setup>;
 
 const DEAL_PATH = `/deals/${TEST_DEAL.id}`;
 const HEADING_ID = 'new-deal-heading';
+const OPEN_TASKS: TaskFilters = { isMine: true, status: 'open' };
+const NO_TASKS = { pages: [{ items: [], nextCursor: null }], pageParams: [null] };
 
 function answerCreate(resolver: Resolver): Request[] {
   return recordRequests('post', '/api/deals', resolver);
@@ -445,6 +449,20 @@ describe('deal form', () => {
         expect(mockRouter.replace).toHaveBeenCalledWith(DEAL_PATH);
       });
       expect(await requests[0]?.json()).toEqual({ version: TEST_DEAL.version, amount: 200000 });
+    });
+
+    it('should mark the tasks stale when the deal is saved', async () => {
+      answerUpdate(() => HttpResponse.json(TEST_DEAL));
+      const user = userEvent.setup();
+      const { queryClient } = renderEdit();
+      queryClient.setQueryData(taskKeys.list(OPEN_TASKS), NO_TASKS);
+
+      await user.type(await screen.findByLabelText('Title'), '!');
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() => {
+        expect(queryClient.getQueryState(taskKeys.list(OPEN_TASKS))?.isInvalidated).toBe(true);
+      });
     });
 
     it('should show the newer deal and save at its version when it arrives before any change', async () => {

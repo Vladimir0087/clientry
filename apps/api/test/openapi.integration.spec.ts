@@ -281,7 +281,7 @@ describe('OpenAPI document', () => {
     );
   });
 
-  describe('deals, stages and members operations', () => {
+  describe('deals, stages, members, tasks and notifications operations', () => {
     const OPERATIONS = [
       ['get', '/api/deals/board', 'deals'],
       ['get', '/api/deals', 'deals'],
@@ -298,6 +298,18 @@ describe('OpenAPI document', () => {
       ['put', '/api/stages/order', 'stages'],
       ['delete', '/api/stages/{id}', 'stages'],
       ['get', '/api/members', 'members'],
+      ['get', '/api/tasks', 'tasks'],
+      ['post', '/api/tasks', 'tasks'],
+      ['get', '/api/tasks/{id}', 'tasks'],
+      ['patch', '/api/tasks/{id}', 'tasks'],
+      ['post', '/api/tasks/{id}/complete', 'tasks'],
+      ['post', '/api/tasks/{id}/reopen', 'tasks'],
+      ['delete', '/api/tasks/{id}', 'tasks'],
+      ['post', '/api/tasks/{id}/restore', 'tasks'],
+      ['get', '/api/notifications', 'notifications'],
+      ['get', '/api/notifications/unread-count', 'notifications'],
+      ['post', '/api/notifications/{id}/read', 'notifications'],
+      ['post', '/api/notifications/read-all', 'notifications'],
     ] as const;
 
     const STAGE_WRITES = OPERATIONS.filter(
@@ -331,9 +343,9 @@ describe('OpenAPI document', () => {
       return (op?.parameters ?? []).filter((p) => p.in === location).map(({ name }) => name);
     }
 
-    it('should document 15 operations under deals, stages and members when the document is built', () => {
+    it('should document 27 operations under deals, stages, members, tasks and notifications when the document is built', () => {
       const paths = Object.entries(document.paths as Record<string, Record<string, unknown>>)
-        .filter(([path]) => /^\/api\/(deals|stages|members)/.test(path))
+        .filter(([path]) => /^\/api\/(deals|stages|members|tasks|notifications)/.test(path))
         .flatMap(([path, item]) => Object.keys(item).map((method) => `${method} ${path}`));
 
       expect(paths.toSorted()).toEqual(
@@ -384,6 +396,42 @@ describe('OpenAPI document', () => {
       'should list the query parameter when %s %s is documented',
       (method, path, name) => {
         expect(parameterNames(operation(method, path), 'query')).toEqual([name]);
+      },
+    );
+
+    it('should list every task list filter as a query parameter when get /api/tasks is documented', () => {
+      expect(parameterNames(operation('get', '/api/tasks'), 'query')).toEqual([
+        'status',
+        'assignee',
+        'clientId',
+        'dealId',
+        'cursor',
+        'limit',
+      ]);
+    });
+
+    it('should list the cursor and the limit as query parameters when get /api/notifications is documented', () => {
+      expect(parameterNames(operation('get', '/api/notifications'), 'query')).toEqual([
+        'cursor',
+        'limit',
+      ]);
+    });
+
+    it.each([
+      ['post', '/api/notifications/{id}/read', 'NOTIFICATION_NOT_FOUND'],
+      ['patch', '/api/tasks/{id}', 'TASK_NOT_FOUND'],
+      ['delete', '/api/tasks/{id}', 'TASK_DELETE_FORBIDDEN'],
+      ['post', '/api/tasks/{id}/restore', 'TASK_DELETE_FORBIDDEN'],
+    ] as const)(
+      'should give the %s %s error example %s when the operation is documented',
+      (method, path, code) => {
+        const responses = operation(method, path)?.responses ?? {};
+        const examples = Object.values(responses).flatMap((response) => {
+          const content = response.content?.['application/problem+json'];
+          return [content?.example?.code, ...Object.keys(content?.examples ?? {})];
+        });
+
+        expect(examples).toContain(code);
       },
     );
 

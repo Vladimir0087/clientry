@@ -8,7 +8,10 @@ import type { ClientFilters } from '@/entities/client';
 import { boardPath, dealKeys, stageKeys } from '@/entities/deal';
 import type { BoardFilters } from '@/entities/deal';
 import { memberKeys } from '@/entities/member';
+import { notificationKeys } from '@/entities/notification';
 import { sessionKeys } from '@/entities/session';
+import { taskKeys, taskListPath } from '@/entities/task';
+import type { TaskFilters } from '@/entities/task';
 import { ApiError } from '@/shared/api/api-error';
 import type { ApiPath } from '@/shared/api/api-path';
 import { isNotFound } from '@/shared/api/api-status';
@@ -28,6 +31,8 @@ import {
   dealSchema,
   stageListResponseSchema,
 } from '@clientry/shared/deals';
+import { unreadCountResponseSchema } from '@clientry/shared/notifications';
+import { taskListResponseSchema, taskSchema } from '@clientry/shared/tasks';
 import { memberListResponseSchema } from '@clientry/shared/workspaces';
 
 const PREFETCH_TIMEOUT_MS = 1000;
@@ -201,6 +206,51 @@ export function prefetchMembers(queryClient: QueryClient, request: PrefetchReque
     queryClient.query({
       queryKey: memberKeys.list,
       queryFn: ({ signal }) => fetch('/api/members', memberListResponseSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchTaskList(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+  filters: TaskFilters,
+): Promise<void> {
+  return prefetch(request, { label: 'Task list' }, (fetch) =>
+    queryClient.infiniteQuery({
+      queryKey: taskKeys.list(filters),
+      queryFn: ({ signal }) => fetch(taskListPath(filters, null), taskListResponseSchema, signal),
+      initialPageParam: null,
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchTask(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+  id: string,
+): Promise<void> {
+  return prefetch(request, { label: 'Task', isExpected: isNotFound }, (fetch) =>
+    queryClient.query({
+      queryKey: taskKeys.detail(id),
+      queryFn: ({ signal }) => fetch(`/api/tasks/${id}`, taskSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+// From the server function to the API directly, so the badge is in the first HTML without a
+// call through the /api rewrite.
+export function prefetchUnreadCount(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+): Promise<void> {
+  return prefetch(request, { label: 'Unread count' }, (fetch) =>
+    queryClient.query({
+      queryKey: notificationKeys.unreadCount,
+      queryFn: ({ signal }) =>
+        fetch('/api/notifications/unread-count', unreadCountResponseSchema, signal),
       retry: false,
     }),
   );

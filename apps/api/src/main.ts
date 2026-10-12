@@ -36,7 +36,7 @@ registerFatalHandlers(process, logger);
 try {
   const app = await createApp((adapter, options) =>
     NestFactory.create<NestExpressApplication>(
-      AppModule.forRoot({ config, logger }),
+      AppModule.forRoot({ config, logger, shouldRunJobs: true }),
       adapter,
       options,
     ),

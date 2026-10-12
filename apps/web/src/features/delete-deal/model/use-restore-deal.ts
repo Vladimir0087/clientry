@@ -3,6 +3,7 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { dealKeys, restoreDeal, stageKeys } from '@/entities/deal';
+import { taskKeys } from '@/entities/task';
 import type { Deal } from '@clientry/shared/deals';
 
 // Undo runs after the deal page has unmounted, and TanStack drops mutate() callbacks of an
@@ -18,6 +19,7 @@ export function useRestoreDeal(): UseMutationResult<Deal, Error, string> {
       void queryClient.invalidateQueries({ queryKey: dealKeys.byClient(deal.client.id) });
       void queryClient.invalidateQueries({ queryKey: dealKeys.detail(deal.id) });
       void queryClient.invalidateQueries({ queryKey: dealKeys.history(deal.id) });
+      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
     onError: () => {
       toast.error('Could not restore the deal.');

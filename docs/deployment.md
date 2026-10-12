@@ -328,3 +328,29 @@ The API also answers at its Render URL. A client calling it there directly can p
 into `X-Forwarded-For` and spread login attempts over many rate-limit buckets. Closing it needs a
 secret that only the web adds, which rewrites cannot do. Accepted for the demo; argon2 on 0.1 CPU
 caps throughput anyway.
+
+## Background jobs
+
+The API runs its BullMQ workers in the same process (ADR 0012): `reminders` delivers task reminders
+and sweeps for missing ones every hour; `sessions` purges sessions past their absolute end once a
+day. A clock in the process adds the recurring jobs every 5 minutes, so nothing needs setting up on
+Render and a Valkey restart loses nothing that the next tick does not bring back.
+
+**Connections.** Seven Valkey connections of the 50 Render Key Value allows: the readiness probe,
+one per queue (two) and two per worker (four). Queues fail an add within seconds while Valkey is
+down, and the write that triggered it still succeeds; workers wait the outage out.
+
+**Neon budget.** An idle API touches Postgres only through the hourly sweep, which keeps Neon awake
+for its 5 minutes: about 62 hours a month, 15.5 of the 100 CU-hours at 0.25 CU. The daily session
+purge adds one wake a day when it misses the sweep's, about 2.5 hours a month more. Ticks, waiting
+workers and delayed jobs touch Valkey only.
+
+**Netlify budget.** The bell polls the unread count once a minute through the `/api/*` rewrite, one
+function invocation each: 60 per hour of an active, visible tab, so the 125k a month allow about
+2 000 such tab-hours with nothing else counted. Polling stops in a hidden tab and after 15 minutes
+without input. The count the layout prefetches goes to the API directly and costs no invocation.
+
+**Memory check.** A day after a deploy that changes the workers, Render's memory graph for the API
+should stay under 450 MB of the 512 MB, and Neon's monitoring should show compute suspended between
+the hourly sweeps while nobody uses the demo. If either fails, moving to a server of our own
+(spec 14) is back on the table.

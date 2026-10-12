@@ -38,4 +38,14 @@ describe('ShellHeader', () => {
     expect(screen.queryByText('Acme Studio')).not.toBeInTheDocument();
     expect(screen.queryByTestId('workspace-skeleton')).not.toBeInTheDocument();
   });
+
+  it('should put the bell with its unread count before the theme menu when the header renders', async () => {
+    recordRequests('get', '/api/notifications/unread-count', () => HttpResponse.json({ count: 3 }));
+
+    renderWithProviders(<ShellHeader />);
+
+    const bell = await screen.findByRole('button', { name: 'Notifications, 3 unread' });
+    const theme = screen.getByRole('button', { name: 'Theme' });
+    expect(bell.compareDocumentPosition(theme) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

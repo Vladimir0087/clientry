@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 export interface SelectOption {
   readonly value: string;
   readonly label: string;
+  readonly isDisabled?: boolean;
 }
 
 interface OptionSelectProps extends FieldControlProps {
@@ -15,6 +16,8 @@ interface OptionSelectProps extends FieldControlProps {
   readonly onBlur: () => void;
   readonly ref: React.Ref<HTMLButtonElement>;
   readonly className?: string;
+  readonly isDisabled?: boolean;
+  readonly onOpen?: () => void;
 }
 
 export function OptionSelect({
@@ -24,16 +27,28 @@ export function OptionSelect({
   onBlur,
   ref,
   className,
+  isDisabled = false,
+  onOpen,
   ...control
 }: OptionSelectProps): React.JSX.Element {
+  const handleOpenChange = (isOpen: boolean): void => {
+    if (isOpen) {
+      onOpen?.();
+    }
+  };
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select
+      value={value}
+      disabled={isDisabled}
+      onValueChange={onChange}
+      onOpenChange={handleOpenChange}
+    >
       <SelectTrigger {...control} ref={ref} onBlur={onBlur} className={className}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent position="popper">
         {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
+          <SelectItem key={option.value} value={option.value} disabled={option.isDisabled}>
             {option.label}
           </SelectItem>
         ))}

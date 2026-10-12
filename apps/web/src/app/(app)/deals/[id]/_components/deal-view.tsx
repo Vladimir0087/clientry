@@ -28,6 +28,8 @@ import { RetryFocusBox } from '@/shared/ui/retry-focus-box';
 import { RetryMessage } from '@/shared/ui/retry-message';
 import type { Deal } from '@clientry/shared/deals';
 
+import { TaskSection } from '../../../_components/task-section';
+
 function DealHistorySection({ id }: { readonly id: string }): React.JSX.Element {
   const headingId = useId();
   const history = useDealHistory(id);
@@ -85,6 +87,7 @@ function DealArticle({ deal }: { readonly deal: Deal }): React.JSX.Element {
         deal={deal}
         stageControl={(labelId) => <DealStageSelect deal={deal} labelId={labelId} />}
       />
+      <TaskSection owner={{ dealId: deal.id }} />
       <DealHistorySection id={deal.id} />
     </article>
   );

@@ -8,7 +8,8 @@ import { clientIdParamsSchema } from '@clientry/shared/clients';
 
 import { ClientView } from './_components/client-view';
 import { getPrefetchRequest } from '../../_lib/access-session';
-import { prefetchClient, prefetchClientDeals } from '../../_lib/prefetch';
+import { prefetchClient, prefetchClientDeals, prefetchTaskList } from '../../_lib/prefetch';
+import { taskSectionFilters } from '../../_lib/task-section-filters';
 
 export const metadata: Metadata = { title: 'Client' };
 
@@ -27,6 +28,7 @@ export default async function ClientPage({
   await Promise.all([
     prefetchClient(queryClient, request, id),
     prefetchClientDeals(queryClient, request, id),
+    prefetchTaskList(queryClient, request, taskSectionFilters({ clientId: id })),
   ]);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

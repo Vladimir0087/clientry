@@ -24,6 +24,8 @@ import { RetryFocusBox } from '@/shared/ui/retry-focus-box';
 import { RetryMessage } from '@/shared/ui/retry-message';
 import type { Client } from '@clientry/shared/clients';
 
+import { TaskSection } from '../../../_components/task-section';
+
 interface ClientDealsBodyProps {
   readonly clientId: string;
   readonly headingId: string;
@@ -95,6 +97,7 @@ function ClientCard({ client }: { readonly client: Client }): React.JSX.Element 
       </header>
       <ClientDetails client={client} />
       <ClientDeals clientId={client.id} />
+      <TaskSection owner={{ clientId: client.id }} />
     </article>
   );
 }
