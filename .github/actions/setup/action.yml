@@ -21,7 +21,7 @@ runs:
       env:
         HUSKY: 0
 
-    # next.config.ts needs both outside Vercel builds; the private half of the key is discarded.
+    # next.config.ts needs both, and only deploy-web gets the real ones; the private key is discarded.
     - if: inputs.web-env == 'true'
       run: |
         echo "API_URL=http://127.0.0.1:4000" >> "$GITHUB_ENV"

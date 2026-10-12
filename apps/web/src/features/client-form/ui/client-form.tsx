@@ -8,7 +8,8 @@ import type * as React from 'react';
 import { useForm } from 'react-hook-form';
 import type { UseFormReturn } from 'react-hook-form';
 
-import { CLIENTS_PATH, isNotFound } from '@/entities/client';
+import { CLIENTS_PATH } from '@/entities/client';
+import { isNotFound } from '@/shared/api/api-status';
 import { applySubmitError } from '@/shared/lib/submit-error';
 import type { FormAlertContent } from '@/shared/lib/submit-error';
 import { Button } from '@/shared/ui/button';

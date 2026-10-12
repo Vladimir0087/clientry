@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { clientSourceSchema } from './client-source.js';
 import { CLIENT_LIMITS } from './limits.js';
+import { idSchema } from '../common/id.js';
 import { textSchema } from '../common/text.js';
 
 // A literal space, not \s: tabs and line breaks would be stored and shown as typed.
@@ -86,6 +87,6 @@ export const updateClientRequestSchema = createClientRequestSchema
 
 export type UpdateClientRequest = z.infer<typeof updateClientRequestSchema>;
 
-export const clientIdParamsSchema = z.object({ id: z.uuid() });
+export const clientIdParamsSchema = z.object({ id: idSchema() });
 
 export type ClientIdParams = z.infer<typeof clientIdParamsSchema>;

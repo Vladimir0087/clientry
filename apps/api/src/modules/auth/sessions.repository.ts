@@ -46,4 +46,7 @@ export abstract class SessionsRepository {
   // Marks the token rotated unless it already is, and adds its successor to the same session.
   abstract rotate(rotation: TokenRotation): Promise<void>;
   abstract revokeSession(sessionId: string, now: Date): Promise<void>;
+  // Deletes up to limit sessions of any user that ended at or before the moment, with their tokens;
+  // returns how many went.
+  abstract deleteExpired(now: Date, limit: number): Promise<number>;
 }

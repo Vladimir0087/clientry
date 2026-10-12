@@ -10,28 +10,40 @@ import { createValidationPipe } from './common/pipes/create-validation-pipe.js';
 import type { AppConfig } from './infra/config/app-config.js';
 import { AppConfigModule } from './infra/config/app-config.module.js';
 import { AppLoggerModule } from './infra/logger/app-logger.module.js';
+import { QueueModule } from './infra/queue/queue.module.js';
 import { AccessTokenGuard } from './modules/auth/access-token.guard.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { RolesGuard } from './modules/auth/roles.guard.js';
 import { ClientsModule } from './modules/clients/clients.module.js';
+import { DealsModule } from './modules/deals/deals.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { TasksModule } from './modules/tasks/tasks.module.js';
+import { WorkspacesModule } from './modules/workspaces/workspaces.module.js';
 
 export interface AppModuleOptions {
   readonly config: AppConfig;
   readonly logger: Logger;
+  // Workers and the recurring jobs clock; queues exist either way, so writes still add jobs.
+  readonly shouldRunJobs: boolean;
 }
 
 @Module({})
 export class AppModule {
-  static forRoot({ config, logger }: AppModuleOptions): DynamicModule {
+  static forRoot({ config, logger, shouldRunJobs }: AppModuleOptions): DynamicModule {
     return {
       module: AppModule,
       imports: [
         AppConfigModule.forRoot(config),
         AppLoggerModule.forRoot(logger),
+        QueueModule.forRoot({ shouldRunJobs }),
         AuthModule,
         ClientsModule,
+        DealsModule,
         HealthModule,
+        NotificationsModule,
+        TasksModule,
+        WorkspacesModule,
       ],
       providers: [
         // Global guards run in this order: CSRF check, authentication, role.

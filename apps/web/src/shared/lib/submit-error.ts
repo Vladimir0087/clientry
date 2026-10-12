@@ -2,17 +2,20 @@ import type { Route } from 'next';
 import type { FieldValues, Path, UseFormReturn } from 'react-hook-form';
 
 import { ApiError } from '@/shared/api/api-error';
+import { isApiUnreachable } from '@/shared/api/api-status';
 import type { FieldError } from '@clientry/shared/common';
 
 const VALIDATION_FAILED = 'VALIDATION_FAILED';
 const TOO_MANY_REQUESTS = 429;
 const SECONDS_PER_MINUTE = 60;
 const GENERIC_MESSAGE = 'Something went wrong. Try again.';
+const UNREACHABLE_MESSAGE = 'The server is waking up or busy. Try again in a minute.';
 
 export interface FormAlertContent {
   readonly message: string;
   readonly reference?: string;
   readonly link?: { readonly href: Route; readonly label: string };
+  readonly action?: { readonly label: string; readonly onClick: () => void };
 }
 
 function pluralize(count: number, unit: string): string {
@@ -30,7 +33,10 @@ function rateLimitAlert(retryAfterSeconds: number | undefined): FormAlertContent
   return { message: `Too many attempts. Try again in ${wait}.` };
 }
 
-function unexpectedAlert(error: unknown): FormAlertContent {
+export function unexpectedAlert(error: unknown): FormAlertContent {
+  if (isApiUnreachable(error)) {
+    return { message: UNREACHABLE_MESSAGE };
+  }
   return {
     message: GENERIC_MESSAGE,
     reference: error instanceof ApiError ? error.requestId : undefined,
@@ -47,7 +53,7 @@ function findField<T extends FieldValues>(
 
 // A path that matches no field still reaches the user through the form alert.
 function applyFieldErrors<T extends FieldValues>(
-  form: UseFormReturn<T>,
+  form: Pick<UseFormReturn<T>, 'setError'>,
   errors: readonly FieldError[],
   fields: readonly Path<T>[],
 ): FormAlertContent | null {
@@ -68,7 +74,7 @@ function applyFieldErrors<T extends FieldValues>(
 // The outcomes every form shares; each form handles its own codes before calling this.
 export function applySubmitError<T extends FieldValues>(
   error: unknown,
-  form: UseFormReturn<T>,
+  form: Pick<UseFormReturn<T>, 'setError'>,
   fields: readonly Path<T>[],
 ): FormAlertContent | null {
   if (!(error instanceof ApiError)) {

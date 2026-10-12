@@ -25,6 +25,19 @@ export function fetchClientList(
   return apiRequest(clientListPath(filters, cursor), clientListResponseSchema, { signal });
 }
 
+const SEARCH_LIMIT = 10;
+
+// A short list by name for pickers; an empty term lists the first clients by name.
+export function fetchClientSearch(q: string, signal?: AbortSignal): Promise<ClientListResponse> {
+  const params = new URLSearchParams();
+  if (q !== '') {
+    params.set('q', q);
+  }
+  params.set('sort', 'name_asc');
+  params.set('limit', String(SEARCH_LIMIT));
+  return apiRequest(`/api/clients?${params.toString()}`, clientListResponseSchema, { signal });
+}
+
 export function fetchClient(id: string, signal?: AbortSignal): Promise<Client> {
   return apiRequest(`/api/clients/${id}`, clientResponseSchema, { signal });
 }

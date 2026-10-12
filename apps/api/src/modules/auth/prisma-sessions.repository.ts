@@ -80,4 +80,11 @@ export class PrismaSessionsRepository implements SessionsRepository {
       data: { revokedAt: now },
     });
   }
+
+  // deleteMany takes no limit; a bounded statement keeps each delete's locks and WAL small.
+  deleteExpired(now: Date, limit: number): Promise<number> {
+    return this.prisma.$executeRaw`
+      DELETE FROM sessions
+      WHERE id IN (SELECT id FROM sessions WHERE expires_at <= ${now} LIMIT ${limit})`;
+  }
 }

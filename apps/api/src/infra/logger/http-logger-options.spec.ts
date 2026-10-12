@@ -1,8 +1,13 @@
 import type { Request, Response } from 'express';
+import { pinoHttp } from 'pino-http';
 import { describe, expect, it } from 'vitest';
 
 import { createLogger } from './create-logger.js';
-import { resolveRequestLogLevel, serializeRequest } from './http-logger-options.js';
+import {
+  createHttpLoggerOptions,
+  resolveRequestLogLevel,
+  serializeRequest,
+} from './http-logger-options.js';
 import type { SerializedRequest } from './http-logger-options.js';
 import { createUnitConfig } from '../../../test/support/unit-config.js';
 
@@ -84,19 +89,19 @@ describe('serializeRequest', () => {
     expect(serialized.clientIp).toBe('198.51.100.23');
   });
 
-  it('should drop the geolocation headers when Vercel proxied the request', () => {
+  it('should drop the geolocation headers when Netlify proxied the request', () => {
     const request = standardSerialized({
       headers: {
-        'x-vercel-ip-city': 'Berlin',
-        'x-vercel-ip-latitude': '52.52',
-        'x-vercel-id': 'fra1::abc',
+        'x-nf-geo': 'eyJjaXR5IjoiQmVybGluIn0=',
+        'x-country': 'DE',
+        'x-nf-request-id': '01ABC',
         'x-forwarded-for': '198.51.100.23',
       },
     });
 
     const { headers } = serializeRequest(request);
 
-    expect(headers).toEqual({ 'x-vercel-id': 'fra1::abc', 'x-forwarded-for': '198.51.100.23' });
+    expect(headers).toEqual({ 'x-nf-request-id': '01ABC', 'x-forwarded-for': '198.51.100.23' });
   });
 
   it('should redact the cookie and authorization headers when the request is logged', () => {
@@ -110,5 +115,23 @@ describe('serializeRequest', () => {
       headers: { cookie: '[REDACTED]', authorization: '[REDACTED]' },
     });
     expect(JSON.stringify(entry)).not.toMatch(/s3cret/);
+  });
+});
+
+describe('createHttpLoggerOptions', () => {
+  it('should leave out the command arguments when a request logs a Redis reply error', () => {
+    const lines: string[] = [];
+    const logger = createLogger(createUnitConfig({ LOG_LEVEL: 'info' }), {
+      write: (line) => lines.push(line),
+    });
+    const requestLogger = pinoHttp(createHttpLoggerOptions(logger)).logger;
+    const error = Object.assign(new Error('OOM command not allowed'), {
+      command: { name: 'evalsha', args: ['{"remindAt":"2026-10-15T06:00:00.000Z"}'] },
+    });
+
+    requestLogger.warn({ err: error }, 'Could not queue a reminder');
+
+    expect(lines.join('')).toMatch(/OOM command not allowed/);
+    expect(lines.join('')).not.toMatch(/evalsha|remindAt/);
   });
 });

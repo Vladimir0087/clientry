@@ -22,3 +22,16 @@ export function ApiErrorResponse(
 export function ApiUntrustedOrigin(instance: string): MethodDecorator & ClassDecorator {
   return ApiErrorResponse(HttpStatus.FORBIDDEN, instance, new UntrustedOriginError());
 }
+
+export function ApiInvalidRequest(
+  instance: string,
+  path: string,
+  message: string,
+): MethodDecorator & ClassDecorator {
+  return ApiProblemResponse(HttpStatus.BAD_REQUEST, {
+    code: 'VALIDATION_FAILED',
+    detail: 'Request validation failed',
+    instance,
+    errors: [{ path, message }],
+  });
+}

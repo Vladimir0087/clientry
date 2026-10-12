@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
+import type { Queue } from 'bullmq';
 import type { NextFunction, Request, Response } from 'express';
 
 import { AccessTokenGuard } from './access-token.guard.js';
@@ -13,9 +14,15 @@ import { PasswordHasher } from './password-hasher.js';
 import { PrismaAccountsRepository } from './prisma-accounts.repository.js';
 import { PrismaSessionsRepository } from './prisma-sessions.repository.js';
 import { RolesGuard } from './roles.guard.js';
+import {
+  SESSIONS_QUEUE,
+  SESSIONS_QUEUE_TOKEN,
+  SessionsPurgeWorker,
+} from './sessions-purge.worker.js';
 import { SessionsRepository } from './sessions.repository.js';
 import { TOO_MANY_REQUESTS_DETAIL } from '../../common/http/problem-details.js';
 import { PrismaModule } from '../../infra/prisma/prisma.module.js';
+import { QueueFactory } from '../../infra/queue/queue-factory.js';
 
 // Middleware runs before guards, so rejected and throttled answers are not stored either.
 function noStore(_request: Request, response: Response, next: NextFunction): void {
@@ -40,6 +47,12 @@ function noStore(_request: Request, response: Response, next: NextFunction): voi
     PasswordHasher,
     AccessTokenGuard,
     RolesGuard,
+    SessionsPurgeWorker,
+    {
+      provide: SESSIONS_QUEUE_TOKEN,
+      useFactory: (queues: QueueFactory): Queue => queues.createQueue(SESSIONS_QUEUE),
+      inject: [QueueFactory],
+    },
     { provide: AccountsRepository, useClass: PrismaAccountsRepository },
     { provide: SessionsRepository, useClass: PrismaSessionsRepository },
   ],

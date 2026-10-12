@@ -78,6 +78,7 @@ function createSessionsMock() {
     findToken: vi.fn<SessionsRepository['findToken']>().mockResolvedValue(storedToken()),
     rotate: vi.fn<SessionsRepository['rotate']>().mockResolvedValue(undefined),
     revokeSession: vi.fn<SessionsRepository['revokeSession']>().mockResolvedValue(undefined),
+    deleteExpired: vi.fn<SessionsRepository['deleteExpired']>().mockResolvedValue(0),
   } satisfies SessionsRepository;
 }
 

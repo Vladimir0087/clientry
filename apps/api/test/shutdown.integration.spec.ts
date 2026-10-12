@@ -1,12 +1,19 @@
 import { Agent } from 'node:http';
 
+import { Logger } from '@nestjs/common';
+import { ValkeyContainer } from '@testcontainers/valkey';
 import { Redis } from 'ioredis';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { createTestApp, createTestConfig } from './create-test-app.js';
+import { createTestApp, createTestConfig, UNREACHABLE_REDIS_URL } from './create-test-app.js';
+import { registerAccount } from './fixtures/accounts.js';
+import { createTask } from './fixtures/tasks.js';
+import { resetDatabase } from './reset-database.js';
+import { VALKEY_IMAGE } from './support/test-env.js';
 import { TestOnlyController } from './support/test-only.controller.js';
 import { TestOnlyModule } from './support/test-only.module.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
+import { SHUTDOWN_DEADLINE_MS } from '../src/process-handlers.js';
 
 // Well under Node's default keepAliveTimeout of 5 s, which an unswept connection would wait out.
 const MAX_CLOSE_MS = 2000;
@@ -62,6 +69,72 @@ describe('graceful shutdown', () => {
     expect(response.status).toBe(200);
     await expect.poll(countPostgresClients).toBe(0);
     await expect.poll(countValkeyClients).toBe(0);
+  });
+
+  it('should close the queue and worker connections too when an app running jobs closes', async () => {
+    const { app, http } = await createTestApp({ shouldRunJobs: true });
+    await http.get('/health/ready');
+    // Each worker holds two connections and each queue one.
+    await expect.poll(countValkeyClients).toBe(7);
+
+    await app.close();
+
+    await expect.poll(countPostgresClients).toBe(0);
+    await expect.poll(countValkeyClients).toBe(0);
+  });
+
+  it('should start, take writes and close in time when Valkey is unreachable and jobs run', async () => {
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn');
+    const testApp = await createTestApp({ shouldRunJobs: true, redisUrl: UNREACHABLE_REDIS_URL });
+    try {
+      await resetDatabase(testApp.app.get(PrismaService));
+      await testApp.http.get('/health/live').expect(200);
+      const account = await registerAccount(testApp);
+
+      const task = await createTask(account.http, {
+        title: 'Call Romashka',
+        dueAt: '2030-03-15T12:00:00.000Z',
+        remindAt: new Date(Date.now() + 60_000).toISOString(),
+        assigneeId: account.session.user.id,
+      });
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: task.id }),
+        'Could not queue a reminder',
+      );
+    } finally {
+      const startedAt = performance.now();
+      await testApp.app.close();
+      expect(performance.now() - startedAt).toBeLessThan(SHUTDOWN_DEADLINE_MS);
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('should close in time when Valkey goes away while jobs run', async () => {
+    const valkey = await new ValkeyContainer(VALKEY_IMAGE).start();
+    const redisUrl = valkey.getConnectionUrl();
+    const testApp = await createTestApp({ shouldRunJobs: true, redisUrl });
+    try {
+      const watcher = new Redis(redisUrl);
+      // Both workers wait for jobs, so their connections are ready.
+      await expect
+        .poll(async () => String(await watcher.client('LIST')).split('cmd=bzpopmin').length - 1)
+        .toBe(2);
+      await watcher.quit();
+      await valkey.stop();
+      await resetDatabase(testApp.app.get(PrismaService));
+      const account = await registerAccount(testApp);
+      await createTask(account.http, {
+        title: 'Call Romashka',
+        dueAt: '2030-03-15T12:00:00.000Z',
+        remindAt: new Date(Date.now() + 60_000).toISOString(),
+        assigneeId: account.session.user.id,
+      });
+    } finally {
+      const startedAt = performance.now();
+      await testApp.app.close();
+      expect(performance.now() - startedAt).toBeLessThan(SHUTDOWN_DEADLINE_MS);
+    }
   });
 
   it('should close a keep-alive connection right after its request when the app closes', async () => {

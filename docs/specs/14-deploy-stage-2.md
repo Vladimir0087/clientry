@@ -9,7 +9,7 @@ expanded to the full template first and the free-tier terms are checked again.
 ## 1. Goal
 
 The API and Valkey move from Render's free plan to an Oracle Cloud Always Free virtual machine
-running Docker Compose behind Caddy, so the API never sleeps; the web stays on Vercel and Postgres
+running Docker Compose behind Caddy, so the API never sleeps; the web stays on Netlify and Postgres
 stays on Neon.
 
 ## 2. In scope / Out of scope
@@ -57,14 +57,14 @@ Any one of:
   HTTPS on a free hostname (DuckDNS or nip.io).
 - CI: `deploy-api` deploys over SSH instead of the Render deploy hook; the version wait and
   `smoke-live.sh` stay.
-- Vercel `API_URL` to the new host and a redeploy; `TRUST_PROXY_HOPS` measured again behind Caddy.
+- Netlify `API_URL` to the new host and a redeploy; `TRUST_PROXY_HOPS` measured again behind Caddy.
 - Render service and Key Value removed or kept as a fallback; UptimeRobot kept as a monitor.
 - `docs/deployment.md` and an ADR.
 
 ### Out of scope
 
 - Postgres on the VM: it stays on Neon, so there are no backups to run.
-- The web on the VM: it stays on Vercel.
+- The web on the VM: it stays on Netlify.
 - Buying a domain.
 
 ## 3. Data model

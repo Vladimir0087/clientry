@@ -22,6 +22,8 @@ export interface ApiRequestOptions {
 
 // One per tab: every request that hits an expired token while it runs waits for it.
 let refreshInFlight: Promise<void> | undefined;
+// A 401 can come back after a refresh that started later; that request only needs a retry.
+let finishedRefreshes = 0;
 
 async function sendOk(
   path: ApiPath,
@@ -65,9 +67,13 @@ async function refresh(): Promise<void> {
 }
 
 function refreshOnce(): Promise<void> {
-  refreshInFlight ??= refresh().finally(() => {
-    refreshInFlight = undefined;
-  });
+  refreshInFlight ??= refresh()
+    .then(() => {
+      finishedRefreshes += 1;
+    })
+    .finally(() => {
+      refreshInFlight = undefined;
+    });
   return refreshInFlight;
 }
 
@@ -88,6 +94,7 @@ export async function apiRequest<T>(
   schema: z.ZodType<T>,
   options: ApiRequestOptions = {},
 ): Promise<T> {
+  const refreshesBeforeSend = finishedRefreshes;
   let response: Response;
   try {
     response = await sendOk(path, options);
@@ -95,7 +102,9 @@ export async function apiRequest<T>(
     if (!isAuthenticationRequired(error)) {
       throw error;
     }
-    await refreshOnce();
+    if (finishedRefreshes === refreshesBeforeSend) {
+      await refreshOnce();
+    }
     response = await retryAfterRefresh(path, options);
   }
   return parseSuccessBody(response, schema, path);

@@ -3,7 +3,7 @@
 **/dist
 **/.next
 **/.turbo
-**/.vercel
+**/.netlify
 **/coverage
 **/*.tsbuildinfo
 **/.env
@@ -11,6 +11,6 @@
 docs
 .claude
 apps/api/src/infra/prisma/generated
-# The web ships through Vercel; its manifest stays for the workspace install.
+# The web ships through Netlify; its manifest stays for the workspace install.
 apps/web/*
 !apps/web/package.json

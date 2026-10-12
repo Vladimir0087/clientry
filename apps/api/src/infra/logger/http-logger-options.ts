@@ -2,11 +2,12 @@ import type { Request, Response } from 'express';
 import type { LevelWithSilent, Logger } from 'pino';
 import type { Options } from 'pino-http';
 
+import { serializeError } from './serialize-error.js';
 import { pathWithoutQuery } from '../../common/http/request-path.js';
 
 const HEALTH_PATH_PREFIX = '/health/';
-// Vercel adds the visitor's city, region and coordinates to every proxied request.
-const GEOLOCATION_HEADER_PREFIX = 'x-vercel-ip-';
+// Netlify adds the visitor's country, and city, postal code and coordinates as base64 JSON.
+const GEOLOCATION_HEADERS = new Set(['x-country', 'x-nf-geo']);
 
 export function resolveRequestLogLevel(
   request: Request,
@@ -53,7 +54,7 @@ function withoutGeolocation(
   headers: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> {
   return Object.fromEntries(
-    Object.entries(headers).filter(([name]) => !name.startsWith(GEOLOCATION_HEADER_PREFIX)),
+    Object.entries(headers).filter(([name]) => !GEOLOCATION_HEADERS.has(name)),
   );
 }
 
@@ -80,6 +81,8 @@ export function createHttpLoggerOptions(logger: Logger): Options<Request, Respon
       req: serializeRequest,
       // Response headers add about 1.5 KB per line and say nothing the status does not.
       res: ({ statusCode }: SerializedResponse) => ({ statusCode }),
+      // The request loggers are children with these serializers, so the root's does not reach them.
+      err: serializeError,
     },
   };
 }

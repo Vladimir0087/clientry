@@ -321,7 +321,7 @@ refreshes would trip reuse detection.
 
 - Login and registration pages, Next middleware, the API client with one shared refresh (spec 04).
 - Hosting variables, `TRUST_PROXY_HOPS` on Render, cookies through the Vercel proxy (spec 05).
-- Stage management and the rest of the pipeline (spec 07).
+- Stage management, deals and the board (spec 07).
 - Invites, registration through an invite, member removal, role change (spec 09).
 - Demo login (spec 11).
 - Password change and reset, email verification, account and workspace deletion, a list of active

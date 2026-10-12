@@ -4,6 +4,8 @@ import { HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
 import { clientKeys } from '@/entities/client';
+import { taskKeys } from '@/entities/task';
+import type { TaskFilters } from '@/entities/task';
 import { createQueryClient } from '@/shared/api/query-client';
 import { PageHeading } from '@/shared/ui/page-heading';
 
@@ -11,12 +13,15 @@ import { CreateClientForm } from './create-client-form';
 import { EditClientForm } from './edit-client-form';
 import { TEST_CLIENT } from '../../../../test/clients';
 import { mockRouter } from '../../../../test/mocks/router';
+import { failOnceThenAnswer, failOnceThenWait } from '../../../../test/msw/fail-once';
 import { problemResponse } from '../../../../test/msw/problem';
 import { recordRequests } from '../../../../test/msw/record';
 import type { Resolver } from '../../../../test/msw/record';
 import { renderWithProviders } from '../../../../test/render';
 
 const CARD_PATH = `/clients/${TEST_CLIENT.id}`;
+const OPEN_TASKS: TaskFilters = { isMine: true, status: 'open' };
+const NO_TASKS = { pages: [{ items: [], nextCursor: null }], pageParams: [null] };
 
 function answerCreate(resolver: Resolver): Request[] {
   return recordRequests('post', '/api/clients', resolver);
@@ -169,6 +174,31 @@ describe('client form', () => {
   });
 
   describe('edit', () => {
+    it('should focus the Edit client heading when Try again reloads the client', async () => {
+      recordRequests('get', `/api/clients/${TEST_CLIENT.id}`, failOnceThenWait(TEST_CLIENT));
+      renderWithProviders(<EditClientForm id={TEST_CLIENT.id} />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+      expect(await screen.findByTestId('client-form-skeleton')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Edit client' })).toHaveFocus();
+    });
+
+    it('should focus the not found heading when Try again finds the client deleted', async () => {
+      recordRequests(
+        'get',
+        `/api/clients/${TEST_CLIENT.id}`,
+        failOnceThenAnswer(() => problemResponse(404, 'CLIENT_NOT_FOUND')),
+      );
+      renderWithProviders(<EditClientForm id={TEST_CLIENT.id} />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { level: 1, name: 'Client not found' })).toHaveFocus();
+      });
+    });
+
     it('should keep Save changes disabled until a field changes', async () => {
       const user = userEvent.setup();
       renderEdit();
@@ -193,6 +223,20 @@ describe('client form', () => {
         expect(mockRouter.replace).toHaveBeenCalledWith(CARD_PATH);
       });
       expect(await bodyOf(requests[0])).toEqual({ phone: '', tags: ['landing'] });
+    });
+
+    it('should mark the tasks stale when the client is saved', async () => {
+      answerUpdate(() => HttpResponse.json(TEST_CLIENT));
+      const user = userEvent.setup();
+      const { queryClient } = renderEdit();
+      queryClient.setQueryData(taskKeys.list(OPEN_TASKS), NO_TASKS);
+
+      await user.type(screen.getByLabelText('Company'), ' Group');
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() => {
+        expect(queryClient.getQueryState(taskKeys.list(OPEN_TASKS))?.isInvalidated).toBe(true);
+      });
     });
 
     it('should say the client no longer exists when the save answers 404', async () => {

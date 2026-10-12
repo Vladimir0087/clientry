@@ -19,9 +19,25 @@
       "types": "./dist/common/index.d.ts",
       "default": "./dist/common/index.js"
     },
+    "./deals": {
+      "types": "./dist/deals/index.d.ts",
+      "default": "./dist/deals/index.js"
+    },
     "./health": {
       "types": "./dist/health/index.d.ts",
       "default": "./dist/health/index.js"
+    },
+    "./notifications": {
+      "types": "./dist/notifications/index.d.ts",
+      "default": "./dist/notifications/index.js"
+    },
+    "./tasks": {
+      "types": "./dist/tasks/index.d.ts",
+      "default": "./dist/tasks/index.js"
+    },
+    "./workspaces": {
+      "types": "./dist/workspaces/index.d.ts",
+      "default": "./dist/workspaces/index.js"
     }
   },
   "scripts": {

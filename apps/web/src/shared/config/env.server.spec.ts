@@ -92,6 +92,10 @@ describe('parseWebEnv', () => {
     ['not a PEM', 'not a key'],
     ['an RSA key', keyPair({ type: 'rsa', modulusLength: 2048 }).publicPem],
     ['a P-384 key', keyPair({ type: 'ec', namedCurve: 'P-384' }).publicPem],
+    [
+      'an EC key on a curve without a JWK name',
+      keyPair({ type: 'ec', namedCurve: 'secp224r1' }).publicPem,
+    ],
     ['a private key', P256.privatePem],
   ])('should reject JWT_PUBLIC_KEY when it is %s', (_label, value) => {
     expect(invalidVariables({ ...VALID_ENV, JWT_PUBLIC_KEY: value })).toEqual(['JWT_PUBLIC_KEY']);

@@ -6,7 +6,7 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { ValkeyContainer } from '@testcontainers/valkey';
 import type { TestProject } from 'vitest/node';
 
-import { generateSigningKeyPem } from './support/test-env.js';
+import { generateSigningKeyPem, POSTGRES_IMAGE, VALKEY_IMAGE } from './support/test-env.js';
 
 declare module 'vitest' {
   export interface ProvidedContext {
@@ -15,10 +15,6 @@ declare module 'vitest' {
     jwtPrivateKey: string;
   }
 }
-
-// The same images as compose.yaml.
-const POSTGRES_IMAGE = 'postgres:18';
-const VALKEY_IMAGE = 'valkey/valkey:8.1';
 
 const API_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PRISMA_CLI = fileURLToPath(new URL('../node_modules/prisma/build/index.js', import.meta.url));
