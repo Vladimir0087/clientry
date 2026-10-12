@@ -13,4 +13,6 @@ export const handlers = [
   // The deal forms, the deal page's stage select and the stages page ask for these on mount.
   http.get('*/api/stages', () => HttpResponse.json(TEST_STAGES)),
   http.get('*/api/members', () => HttpResponse.json(TEST_MEMBERS)),
+  // The shell's bell asks for it on every page.
+  http.get('*/api/notifications/unread-count', () => HttpResponse.json({ count: 0 })),
 ];

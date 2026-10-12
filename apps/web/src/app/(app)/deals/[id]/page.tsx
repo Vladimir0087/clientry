@@ -8,7 +8,13 @@ import { dealIdParamsSchema } from '@clientry/shared/deals';
 
 import { DealView } from './_components/deal-view';
 import { getPrefetchRequest } from '../../_lib/access-session';
-import { prefetchDeal, prefetchDealHistory, prefetchStages } from '../../_lib/prefetch';
+import {
+  prefetchDeal,
+  prefetchDealHistory,
+  prefetchStages,
+  prefetchTaskList,
+} from '../../_lib/prefetch';
+import { taskSectionFilters } from '../../_lib/task-section-filters';
 
 export const metadata: Metadata = { title: 'Deal' };
 
@@ -26,6 +32,7 @@ export default async function DealPage({ params }: PageProps<'/deals/[id]'>): Pr
     prefetchDeal(queryClient, request, id),
     prefetchDealHistory(queryClient, request, id),
     prefetchStages(queryClient, request),
+    prefetchTaskList(queryClient, request, taskSectionFilters({ dealId: id })),
   ]);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

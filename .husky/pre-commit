@@ -1,1 +1,2 @@
-pnpm exec lint-staged --concurrent false
+# The .cmd shims on Windows add about 1 000 characters, so lint-staged's 8 191 default overflows.
+pnpm exec lint-staged --concurrent false --max-arg-length 6000

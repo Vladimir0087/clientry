@@ -53,33 +53,44 @@ enum ActivityType {
   @@map("activity_type")
 }
 
+enum NotificationType {
+  task_reminder
+
+  @@map("notification_type")
+}
+
 model User {
-  id            String      @id @default(uuid(7)) @db.Uuid
-  email         String      @unique
-  passwordHash  String      @map("password_hash")
+  id            String         @id @default(uuid(7)) @db.Uuid
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
   name          String
-  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
   membership    Membership?
   sessions      Session[]
   clients       Client[]
-  createdDeals  Deal[]      @relation("DealCreatedBy")
-  assignedDeals Deal[]      @relation("DealAssignee")
+  createdDeals  Deal[]         @relation("DealCreatedBy")
+  assignedDeals Deal[]         @relation("DealAssignee")
   activities    Activity[]
+  createdTasks  Task[]         @relation("TaskCreatedBy")
+  assignedTasks Task[]         @relation("TaskAssignee")
+  notifications Notification[]
 
   @@map("users")
 }
 
 model Workspace {
-  id          String       @id @default(uuid(7)) @db.Uuid
-  name        String
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
-  memberships Membership[]
-  stages      Stage[]
-  clients     Client[]
-  deals       Deal[]
-  activities  Activity[]
+  id            String         @id @default(uuid(7)) @db.Uuid
+  name          String
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships   Membership[]
+  stages        Stage[]
+  clients       Client[]
+  deals         Deal[]
+  activities    Activity[]
+  tasks         Task[]
+  notifications Notification[]
 
   @@map("workspaces")
 }
@@ -156,6 +167,7 @@ model Client {
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
   deals       Deal[]
+  tasks       Task[]
 
   @@index([workspaceId, createdAt, id])
   @@index([workspaceId, name, id])
@@ -191,6 +203,7 @@ model Deal {
   assignee    User       @relation("DealAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
   createdBy   User       @relation("DealCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   activities  Activity[]
+  tasks       Task[]
 
   // Led by stageId: a stage delete checks its foreign key through it.
   @@index([stageId, position, id])
@@ -213,4 +226,55 @@ model Activity {
 
   @@index([dealId, createdAt, id])
   @@map("activities")
+}
+
+model Task {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  workspaceId    String         @map("workspace_id") @db.Uuid
+  createdById    String         @map("created_by_id") @db.Uuid
+  assigneeId     String         @map("assignee_id") @db.Uuid
+  // At most one of clientId and dealId is set; the request schemas are the only gate.
+  clientId       String?        @map("client_id") @db.Uuid
+  dealId         String?        @map("deal_id") @db.Uuid
+  title          String
+  dueAt          DateTime       @map("due_at") @db.Timestamptz(3)
+  remindAt       DateTime?      @map("remind_at") @db.Timestamptz(3)
+  reminderSentAt DateTime?      @map("reminder_sent_at") @db.Timestamptz(3)
+  doneAt         DateTime?      @map("done_at") @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?      @map("deleted_at") @db.Timestamptz(3)
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy      User           @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  assignee       User           @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  client         Client?        @relation(fields: [clientId], references: [id], onDelete: NoAction)
+  deal           Deal?          @relation(fields: [dealId], references: [id], onDelete: NoAction)
+  notifications  Notification[]
+
+  // Open lists read done_at IS NULL forwards, done lists read the same index backwards.
+  @@index([workspaceId, doneAt, dueAt, id])
+  @@index([assigneeId, doneAt, dueAt, id])
+  @@index([clientId, dueAt])
+  @@index([dealId, dueAt])
+  @@index([remindAt])
+  @@map("tasks")
+}
+
+model Notification {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  workspaceId String           @map("workspace_id") @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  taskId      String?          @map("task_id") @db.Uuid
+  type        NotificationType
+  payload     Json
+  readAt      DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  task        Task?            @relation(fields: [taskId], references: [id], onDelete: NoAction)
+
+  @@index([userId, createdAt, id])
+  // workspace_id last: the unread count filters by both and stays an index-only scan.
+  @@index([userId, readAt, workspaceId])
+  @@map("notifications")
 }

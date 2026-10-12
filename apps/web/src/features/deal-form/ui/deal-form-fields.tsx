@@ -1,6 +1,8 @@
 import type * as React from 'react';
 import { Controller } from 'react-hook-form';
 
+import { ClientPicker } from '@/entities/client';
+import type { PickedClient } from '@/entities/client';
 import { currencyName } from '@/entities/deal';
 import { FormField } from '@/shared/ui/form-field';
 import { OptionSelect } from '@/shared/ui/option-select';
@@ -9,8 +11,6 @@ import { TextField } from '@/shared/ui/text-field';
 import { CURRENCIES } from '@clientry/shared/deals';
 import type { Currency } from '@clientry/shared/deals';
 
-import { ClientPicker } from './client-picker';
-import type { PickedClient } from './client-picker';
 import type { DealFormApi } from '../model/deal-form-values';
 
 const CURRENCY_OPTIONS: readonly SelectOption[] = CURRENCIES.map((currency) => ({

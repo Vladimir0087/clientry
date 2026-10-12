@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { clientKeys } from '@/entities/client';
 import { dealKeys } from '@/entities/deal';
+import { taskKeys } from '@/entities/task';
 import { createQueryClient } from '@/shared/api/query-client';
 import type { Client } from '@clientry/shared/clients';
 import type { DealListResponse } from '@clientry/shared/deals';
@@ -16,6 +17,8 @@ import { failOnceThenAnswer, failOnceThenWait } from '../../../../../../test/msw
 import { problemResponse } from '../../../../../../test/msw/problem';
 import { recordRequests } from '../../../../../../test/msw/record';
 import { renderWithProviders } from '../../../../../../test/render';
+import { CLIENT_RELATED, makeTask, makeTaskPage } from '../../../../../../test/tasks';
+import { taskSectionFilters } from '../../../_lib/task-section-filters';
 
 const NO_DEALS: DealListResponse = { items: [], hasMore: false };
 
@@ -29,6 +32,41 @@ function renderCard(client: Client, deals: DealListResponse = NO_DEALS): void {
 describe('ClientView', () => {
   beforeEach(() => {
     recordRequests('get', '/api/deals', () => HttpResponse.json(NO_DEALS));
+    recordRequests('get', '/api/tasks', () => HttpResponse.json(makeTaskPage([])));
+  });
+
+  it('should list the open tasks, name the deal of a deal row and offer a new task for the client', () => {
+    const dealTask = makeTask(1);
+    const clientTask = makeTask(2, { related: CLIENT_RELATED });
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(clientKeys.detail(TEST_CLIENT.id), TEST_CLIENT);
+    queryClient.setQueryData(dealKeys.byClient(TEST_CLIENT.id), NO_DEALS);
+    queryClient.setQueryData(taskKeys.list(taskSectionFilters({ clientId: TEST_CLIENT.id })), {
+      pages: [makeTaskPage([dealTask, clientTask])],
+      pageParams: [null],
+    });
+
+    renderWithProviders(<ClientView id={TEST_CLIENT.id} />, queryClient);
+
+    const section = screen.getByRole('region', { name: 'Tasks' });
+    expect(within(section).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(section).getByRole('link', { name: `Deal ${TEST_DEAL.title}` })).toHaveAttribute(
+      'href',
+      `/deals/${TEST_DEAL.id}`,
+    );
+    expect(within(section).queryByRole('link', { name: /^Client / })).not.toBeInTheDocument();
+    expect(within(section).getAllByText(dealTask.assignee.name)).toHaveLength(2);
+    expect(within(section).getByRole('link', { name: 'New task' })).toHaveAttribute(
+      'href',
+      `/tasks/new?clientId=${TEST_CLIENT.id}`,
+    );
+  });
+
+  it('should say the client has no open tasks when the list is empty', async () => {
+    renderCard(TEST_CLIENT);
+
+    const section = screen.getByRole('region', { name: 'Tasks' });
+    expect(await within(section).findByText('No open tasks')).toBeInTheDocument();
   });
 
   it('should list the deals with stage, amount and assignee when the client has deals', () => {

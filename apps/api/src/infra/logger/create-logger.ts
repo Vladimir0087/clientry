@@ -1,6 +1,7 @@
 import { pino } from 'pino';
 import type { DestinationStream, Logger } from 'pino';
 
+import { serializeError } from './serialize-error.js';
 import type { AppConfig } from '../config/app-config.js';
 
 // Response headers, set-cookie included, never reach the log: the response serializer drops them.
@@ -11,6 +12,7 @@ export function createLogger(config: AppConfig, destination?: DestinationStream)
     {
       level: config.logLevel,
       redact: { paths: REDACTED_PATHS, censor: '[REDACTED]' },
+      serializers: { err: serializeError },
       // pino-pretty is a dev dependency, absent from the production install.
       transport: config.nodeEnv === 'development' ? { target: 'pino-pretty' } : undefined,
     },

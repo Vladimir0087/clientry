@@ -5,6 +5,11 @@ export function requestHeadingFocus(): void {
   isHeadingFocusRequested = true;
 }
 
+// For a page already in view: its heading mounted before any request could reach it.
+export function focusPageHeading(): void {
+  document.querySelector<HTMLElement>('main h1')?.focus();
+}
+
 export function takeHeadingFocusRequest(): boolean {
   const isRequested = isHeadingFocusRequested;
   isHeadingFocusRequested = false;

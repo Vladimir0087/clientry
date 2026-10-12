@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 
 import { clientKeys, DEFAULT_CLIENT_FILTERS, useClientList } from '@/entities/client';
 import { dealKeys, stageKeys, useClientDeals } from '@/entities/deal';
+import { taskKeys, useTasks } from '@/entities/task';
+import type { TaskFilters } from '@/entities/task';
 import { createQueryClient } from '@/shared/api/query-client';
 import type { Client } from '@clientry/shared/clients';
 
@@ -22,6 +24,9 @@ import { renderWithProviders } from '../../../../test/render';
 const CLIENT_PATH = `/api/clients/${TEST_CLIENT.id}`;
 const MANAGER_SESSION = { ...TEST_SESSION, role: 'manager' as const };
 const OTHERS_CLIENT: Client = { ...TEST_CLIENT, createdBy: OTHER_USER };
+const OPEN_TASKS: TaskFilters = { isMine: true, status: 'open' };
+const CLIENT_TASKS: TaskFilters = { isMine: false, status: 'open', clientId: TEST_CLIENT.id };
+const NO_TASKS = { pages: [{ items: [], nextCursor: null }], pageParams: [null] };
 
 function ClientList(): React.JSX.Element | null {
   useClientList(DEFAULT_CLIENT_FILTERS);
@@ -43,9 +48,10 @@ function Screen({ client, isCardShown }: CardProps): React.JSX.Element {
   );
 }
 
-// The card keeps its deals mounted while the route is being replaced.
-function CardWithDeals({ client }: { readonly client: Client }): React.JSX.Element {
+// The card keeps its deals and tasks mounted while the route is being replaced.
+function CardWithSections({ client }: { readonly client: Client }): React.JSX.Element {
   useClientDeals(client.id);
+  useTasks(CLIENT_TASKS);
   return <DeleteClientButton client={client} />;
 }
 
@@ -114,17 +120,21 @@ describe('DeleteClientButton', () => {
     expect(queryClient.getQueryState(clientKeys.detail(TEST_CLIENT.id))?.isInvalidated).toBe(true);
   });
 
-  it('should say the deals go with the client and mark deals and stages stale without refetching the card deals when confirmed', async () => {
+  it('should say the deals and tasks go with the client and mark them stale without refetching the card deals when confirmed', async () => {
     answerDelete(() => new HttpResponse(null, { status: 204 }));
+    const taskReads = recordRequests('get', '/api/tasks', () =>
+      HttpResponse.json({ items: [], nextCursor: null }),
+    );
     const queryClient = createQueryClient();
     queryClient.setQueryData(dealKeys.board({ isMine: false }), makeBoard([]));
     queryClient.setQueryData(dealKeys.byClient(TEST_CLIENT.id), { items: [], hasMore: false });
     queryClient.setQueryData(stageKeys.list, TEST_STAGES);
-    renderWithProviders(<CardWithDeals client={TEST_CLIENT} />, queryClient);
+    queryClient.setQueryData(taskKeys.list(CLIENT_TASKS), NO_TASKS);
+    renderWithProviders(<CardWithSections client={TEST_CLIENT} />, queryClient);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(await screen.findByRole('alertdialog')).toHaveAccessibleDescription(
-      'The client and their deals disappear from lists, search and the board. You can undo this right after.',
+      'The client, their deals and tasks disappear from lists, search and the board. You can undo this right after.',
     );
     await userEvent.click(
       within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
@@ -139,6 +149,28 @@ describe('DeleteClientButton', () => {
     expect(queryClient.getQueryState(dealKeys.byClient(TEST_CLIENT.id))).toMatchObject({
       isInvalidated: true,
       fetchStatus: 'idle',
+    });
+    expect(queryClient.getQueryState(taskKeys.list(CLIENT_TASKS))).toMatchObject({
+      isInvalidated: true,
+      fetchStatus: 'idle',
+    });
+    expect(taskReads).toHaveLength(0);
+  });
+
+  it('should mark the tasks stale when Undo restores the client', async () => {
+    answerDelete(() => new HttpResponse(null, { status: 204 }));
+    recordRequests('post', `${CLIENT_PATH}/restore`, () => HttpResponse.json(TEST_CLIENT));
+    const queryClient = createQueryClient();
+    renderWithProviders(<DeleteClientButton client={TEST_CLIENT} />, queryClient);
+    await confirmDelete();
+    const undo = await screen.findByRole('button', { name: 'Undo' });
+    queryClient.setQueryData(taskKeys.list(OPEN_TASKS), NO_TASKS);
+
+    // A plain click: user-event's focus change hands sonner a relatedTarget jsdom cannot focus.
+    fireEvent.click(undo);
+
+    await waitFor(() => {
+      expect(queryClient.getQueryState(taskKeys.list(OPEN_TASKS))?.isInvalidated).toBe(true);
     });
   });
 

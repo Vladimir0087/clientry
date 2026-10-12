@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import type * as React from 'react';
 
 import { useClient } from '@/entities/client';
+import type { PickedClient } from '@/entities/client';
 import { DEALS_PATH, dealPath, useStages } from '@/entities/deal';
 import { useMembers } from '@/entities/member';
 import { useSession } from '@/entities/session';
@@ -14,7 +15,6 @@ import type { SessionResponse } from '@clientry/shared/auth';
 import type { StageListItem } from '@clientry/shared/deals';
 import type { Member } from '@clientry/shared/workspaces';
 
-import type { PickedClient } from './client-picker';
 import { DealForm } from './deal-form';
 import { DealFormSkeleton } from './deal-form-skeleton';
 import { emptyDealValues } from '../model/deal-form-values';

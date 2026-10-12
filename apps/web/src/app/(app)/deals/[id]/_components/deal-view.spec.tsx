@@ -1,9 +1,10 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { dealKeys, stageKeys } from '@/entities/deal';
+import { taskKeys } from '@/entities/task';
 import { createQueryClient } from '@/shared/api/query-client';
 import { requestHeadingFocus } from '@/shared/lib/heading-focus';
 import { dealHistoryResponseSchema } from '@clientry/shared/deals';
@@ -17,6 +18,8 @@ import { failOnceThenAnswer, failOnceThenWait } from '../../../../../../test/msw
 import { problemResponse } from '../../../../../../test/msw/problem';
 import { recordRequests } from '../../../../../../test/msw/record';
 import { renderWithProviders } from '../../../../../../test/render';
+import { makeTask, makeTaskPage } from '../../../../../../test/tasks';
+import { taskSectionFilters } from '../../../_lib/task-section-filters';
 
 const ANN = TEST_DEAL.assignee;
 const ROMASHKA = TEST_DEAL.client;
@@ -76,6 +79,40 @@ function renderPage(queryClient = createQueryClient()): ReturnType<typeof render
 }
 
 describe('DealView', () => {
+  beforeEach(() => {
+    recordRequests('get', '/api/tasks', () => HttpResponse.json(makeTaskPage([])));
+  });
+
+  it('should list the open tasks with assignees and offer a new task for the deal', () => {
+    const queryClient = createQueryClient();
+    const task = makeTask(1);
+    queryClient.setQueryData(taskKeys.list(taskSectionFilters({ dealId: TEST_DEAL.id })), {
+      pages: [makeTaskPage([task])],
+      pageParams: [null],
+    });
+
+    renderPage(queryClient);
+
+    const section = screen.getByRole('region', { name: 'Tasks' });
+    expect(within(section).getByRole('link', { name: task.title })).toHaveAttribute(
+      'href',
+      `/tasks/${task.id}`,
+    );
+    expect(within(section).getByText(task.assignee.name)).toBeInTheDocument();
+    expect(within(section).queryByRole('link', { name: /^Deal / })).not.toBeInTheDocument();
+    expect(within(section).getByRole('link', { name: 'New task' })).toHaveAttribute(
+      'href',
+      `/tasks/new?dealId=${TEST_DEAL.id}`,
+    );
+  });
+
+  it('should say the deal has no open tasks when the list is empty', async () => {
+    renderPage();
+
+    const section = screen.getByRole('region', { name: 'Tasks' });
+    expect(await within(section).findByText('No open tasks')).toBeInTheDocument();
+  });
+
   it('should show the details and link the client when the deal loads', () => {
     renderPage();
 

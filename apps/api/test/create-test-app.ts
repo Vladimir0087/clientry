@@ -23,6 +23,8 @@ export interface TestAppOverrides {
   readonly trustProxyHops?: number;
   // Off by default: fixtures register and log in far more often than the limits allow.
   readonly isRateLimited?: boolean;
+  // Off by default: a background sweep would land in the SQL statement counts of other tests.
+  readonly shouldRunJobs?: boolean;
 }
 
 export interface TestApp {
@@ -47,7 +49,11 @@ export async function createTestApp(overrides: TestAppOverrides = {}): Promise<T
   const config = createTestConfig(overrides);
   const builder = Test.createTestingModule({
     imports: [
-      AppModule.forRoot({ config, logger: createLogger(config) }),
+      AppModule.forRoot({
+        config,
+        logger: createLogger(config),
+        shouldRunJobs: overrides.shouldRunJobs === true,
+      }),
       ...(overrides.imports ?? []),
     ],
   });

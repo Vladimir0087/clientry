@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { LevelWithSilent, Logger } from 'pino';
 import type { Options } from 'pino-http';
 
+import { serializeError } from './serialize-error.js';
 import { pathWithoutQuery } from '../../common/http/request-path.js';
 
 const HEALTH_PATH_PREFIX = '/health/';
@@ -80,6 +81,8 @@ export function createHttpLoggerOptions(logger: Logger): Options<Request, Respon
       req: serializeRequest,
       // Response headers add about 1.5 KB per line and say nothing the status does not.
       res: ({ statusCode }: SerializedResponse) => ({ statusCode }),
+      // The request loggers are children with these serializers, so the root's does not reach them.
+      err: serializeError,
     },
   };
 }

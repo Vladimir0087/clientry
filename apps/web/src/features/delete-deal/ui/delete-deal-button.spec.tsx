@@ -5,6 +5,8 @@ import type * as React from 'react';
 import { describe, expect, it } from 'vitest';
 
 import { dealKeys, stageKeys, useStages } from '@/entities/deal';
+import { taskKeys, useTasks } from '@/entities/task';
+import type { TaskFilters } from '@/entities/task';
 import { createQueryClient } from '@/shared/api/query-client';
 import type { Deal } from '@clientry/shared/deals';
 
@@ -21,9 +23,17 @@ import { renderWithProviders } from '../../../../test/render';
 const DEAL_PATH = `/api/deals/${TEST_DEAL.id}`;
 const MANAGER_SESSION = { ...TEST_SESSION, role: 'manager' as const };
 const OTHERS_DEAL: Deal = { ...TEST_DEAL, createdBy: OTHER_USER };
+const DEAL_TASKS: TaskFilters = { isMine: false, status: 'open', dealId: TEST_DEAL.id };
+const NO_TASKS = { pages: [{ items: [], nextCursor: null }], pageParams: [null] };
 
 function DealPage({ isShown }: { readonly isShown: boolean }): React.JSX.Element | null {
   return isShown ? <DeleteDealButton deal={TEST_DEAL} /> : null;
+}
+
+// The deal page keeps its tasks mounted while the route is being replaced.
+function DealPageWithTasks(): React.JSX.Element {
+  useTasks(DEAL_TASKS);
+  return <DeleteDealButton deal={TEST_DEAL} />;
 }
 
 // The deal page's stage select, which leaves with the page.
@@ -114,6 +124,48 @@ describe('DeleteDealButton', () => {
     await screen.findByText('Deal deleted');
     expect(queryClient.getQueryState(stageKeys.list)?.isInvalidated).toBe(true);
     expect(stageRequests).toHaveLength(1);
+  });
+
+  it('should say the tasks go with the deal and mark them stale without a refetch when confirmed', async () => {
+    answerDelete(() => new HttpResponse(null, { status: 204 }));
+    const taskReads = recordRequests('get', '/api/tasks', () =>
+      HttpResponse.json({ items: [], nextCursor: null }),
+    );
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(taskKeys.list(DEAL_TASKS), NO_TASKS);
+    renderWithProviders(<DealPageWithTasks />, queryClient);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    expect(await screen.findByRole('alertdialog')).toHaveAccessibleDescription(
+      "The deal and its tasks disappear from the board and the client's deals. You can undo this right after.",
+    );
+    await userEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+    );
+
+    await screen.findByText('Deal deleted');
+    expect(queryClient.getQueryState(taskKeys.list(DEAL_TASKS))).toMatchObject({
+      isInvalidated: true,
+      fetchStatus: 'idle',
+    });
+    expect(taskReads).toHaveLength(0);
+  });
+
+  it('should mark the tasks stale when Undo restores the deal', async () => {
+    answerDelete(() => new HttpResponse(null, { status: 204 }));
+    recordRequests('post', `${DEAL_PATH}/restore`, () => HttpResponse.json(TEST_DEAL));
+    const queryClient = createQueryClient();
+    renderWithProviders(<DealPage isShown />, queryClient);
+    await confirmDelete();
+    const undo = await screen.findByRole('button', { name: 'Undo' });
+    queryClient.setQueryData(taskKeys.list(DEAL_TASKS), NO_TASKS);
+
+    // A plain click: user-event's focus change hands sonner a relatedTarget jsdom cannot focus.
+    fireEvent.click(undo);
+
+    await waitFor(() => {
+      expect(queryClient.getQueryState(taskKeys.list(DEAL_TASKS))?.isInvalidated).toBe(true);
+    });
   });
 
   it('should keep the dialog buttons off when the delete succeeded and the page is leaving', async () => {

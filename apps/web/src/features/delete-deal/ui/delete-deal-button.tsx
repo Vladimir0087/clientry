@@ -21,7 +21,7 @@ function DeleteDealDialog({ deal }: DeleteDealButtonProps): React.JSX.Element {
   return (
     <ConfirmDeleteDialog
       name={deal.title}
-      description="The deal disappears from the board and the client's deals. You can undo this right after."
+      description="The deal and its tasks disappear from the board and the client's deals. You can undo this right after."
       forbiddenMessage="You can delete only deals you created."
       deletion={deletion}
       onConfirm={handleConfirm}

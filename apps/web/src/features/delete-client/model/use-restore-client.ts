@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { clientKeys, restoreClient } from '@/entities/client';
 import { dealKeys, stageKeys } from '@/entities/deal';
+import { taskKeys } from '@/entities/task';
 import type { Client } from '@clientry/shared/clients';
 
 // Undo runs after the card has unmounted, and TanStack drops mutate() callbacks of an unmounted
@@ -19,6 +20,7 @@ export function useRestoreClient(): UseMutationResult<Client, Error, string> {
       void queryClient.invalidateQueries({ queryKey: clientKeys.detail(client.id) });
       void queryClient.invalidateQueries({ queryKey: dealKeys.all });
       void queryClient.invalidateQueries({ queryKey: stageKeys.all });
+      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
     onError: () => {
       toast.error('Could not restore the client.');

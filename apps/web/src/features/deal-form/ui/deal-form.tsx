@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as React from 'react';
 import { useForm } from 'react-hook-form';
 
+import type { PickedClient } from '@/entities/client';
 import { DEALS_PATH } from '@/entities/deal';
 import { hasErrorCode, isNotFound } from '@/shared/api/api-status';
 import { applySubmitError } from '@/shared/lib/submit-error';
@@ -18,7 +19,6 @@ import type { SelectOption } from '@/shared/ui/option-select';
 import { SubmitButton } from '@/shared/ui/submit-button';
 import { TextField } from '@/shared/ui/text-field';
 
-import type { PickedClient } from './client-picker';
 import { AmountFields, ChoiceField, ClientField } from './deal-form-fields';
 import { DEAL_FIELDS, dealFormSchema } from '../model/deal-form-values';
 import type { DealFormApi, DealFormOutput, DealFormValues } from '../model/deal-form-values';

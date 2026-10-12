@@ -21,7 +21,7 @@ function DeleteClientDialog({ client }: DeleteClientButtonProps): React.JSX.Elem
   return (
     <ConfirmDeleteDialog
       name={client.name}
-      description="The client and their deals disappear from lists, search and the board. You can undo this right after."
+      description="The client, their deals and tasks disappear from lists, search and the board. You can undo this right after."
       forbiddenMessage="You can delete only clients you created."
       deletion={deletion}
       onConfirm={handleConfirm}

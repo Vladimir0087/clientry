@@ -3,6 +3,7 @@ import type { QueryClient, UseMutationResult } from '@tanstack/react-query';
 
 import { createDeal, dealKeys, stageKeys, updateDeal } from '@/entities/deal';
 import { memberKeys } from '@/entities/member';
+import { taskKeys } from '@/entities/task';
 import { ApiError } from '@/shared/api/api-error';
 import type { CreateDealRequest, Deal, UpdateDealRequest } from '@clientry/shared/deals';
 
@@ -40,7 +41,8 @@ export function useCreateDeal(): UseMutationResult<Deal, Error, CreateDealReques
   });
 }
 
-// Every client's list: a changed client moves the deal from one list to another.
+// Every client's list: a changed client moves the deal from one list to another. Task rows show
+// deal titles, and the deal's tasks follow it to its new client's card.
 export function useUpdateDeal(): UseMutationResult<Deal, Error, UpdateVariables> {
   const queryClient = useQueryClient();
   return useMutation({
@@ -50,6 +52,7 @@ export function useUpdateDeal(): UseMutationResult<Deal, Error, UpdateVariables>
       void queryClient.invalidateQueries({ queryKey: dealKeys.boards });
       void queryClient.invalidateQueries({ queryKey: dealKeys.history(deal.id) });
       void queryClient.invalidateQueries({ queryKey: dealKeys.clientLists });
+      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
     onError: (error) => {
       refreshRefusedOptions(queryClient, error);

@@ -3,11 +3,9 @@
 import { useSyncExternalStore } from 'react';
 import type * as React from 'react';
 
+import { DATE_TIME_FORMAT } from '@/shared/lib/local-date-time';
+
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
-const DATE_TIME_FORMAT = new Intl.DateTimeFormat('en-US', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
 
 function subscribe(): () => void {
   return () => undefined;
