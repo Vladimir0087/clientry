@@ -4,7 +4,8 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { useId } from 'react';
 import type * as React from 'react';
 
-import { roleLabel, useSession } from '@/entities/session';
+import { useSession } from '@/entities/session';
+import { roleLabel } from '@/shared/lib/role-label';
 import { RetryFocusBox } from '@/shared/ui/retry-focus-box';
 import { RetryMessage } from '@/shared/ui/retry-message';
 import type { SessionResponse } from '@clientry/shared/auth';

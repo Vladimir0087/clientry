@@ -59,8 +59,8 @@ describe('access control', () => {
     });
   });
 
-  describe('roles', () => {
-    it('should answer 200 when the owner calls an owner-only route', async () => {
+  describe('permissions', () => {
+    it('should answer 200 when the owner calls a route that needs a permission owners hold', async () => {
       const { http } = await registerAccount(testApp);
 
       const response = await http.get('/api/test/protected/owner');
@@ -68,7 +68,7 @@ describe('access control', () => {
       expect(response.status).toBe(200);
     });
 
-    it('should answer 403 INSUFFICIENT_ROLE when a manager calls an owner-only route', async () => {
+    it('should answer 403 INSUFFICIENT_ROLE when a manager calls a route that needs a permission managers lack', async () => {
       const owner = await registerAccount(testApp);
       const manager = await addManager(testApp, owner.session.workspace.id);
 

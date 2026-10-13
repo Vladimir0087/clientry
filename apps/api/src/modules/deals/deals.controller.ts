@@ -76,7 +76,8 @@ function ApiDeleteForbidden(instance: string): MethodDecorator {
   );
 }
 
-// The delete rule runs in the service after the deal is found, so no route carries @Roles.
+// The delete rule runs in the service after the deal is found, so no route carries
+// @RequirePermission.
 @ApiTags('deals')
 @ApiErrorResponse(HttpStatus.UNAUTHORIZED, COLLECTION, new AuthenticationRequiredError())
 @Controller('deals')
@@ -89,7 +90,7 @@ export class DealsController {
   @Get('board')
   @ApiOperation({ summary: 'Every stage as a column with its first deals, count and totals' })
   @ResponseSchema(HttpStatus.OK, boardResponseSchema)
-  @ApiInvalidRequest(BOARD, 'assignee', 'Invalid input: expected "me"')
+  @ApiInvalidRequest(BOARD, 'assignee', 'Invalid input')
   board(
     @CurrentUser() user: AuthUser,
     @Query({ schema: boardQuerySchema }) query: BoardQuery,

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import type { Queue } from 'bullmq';
-import type { NextFunction, Request, Response } from 'express';
 
 import { AccessTokenGuard } from './access-token.guard.js';
 import { AccessTokenService } from './access-token.service.js';
@@ -11,24 +10,20 @@ import { AuthCookies } from './auth-cookies.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { PasswordHasher } from './password-hasher.js';
+import { PermissionsGuard } from './permissions.guard.js';
 import { PrismaAccountsRepository } from './prisma-accounts.repository.js';
 import { PrismaSessionsRepository } from './prisma-sessions.repository.js';
-import { RolesGuard } from './roles.guard.js';
+import { SessionRevocation } from './session-revocation.repository.js';
 import {
   SESSIONS_QUEUE,
   SESSIONS_QUEUE_TOKEN,
   SessionsPurgeWorker,
 } from './sessions-purge.worker.js';
 import { SessionsRepository } from './sessions.repository.js';
+import { noStore } from '../../common/http/no-store.middleware.js';
 import { TOO_MANY_REQUESTS_DETAIL } from '../../common/http/problem-details.js';
 import { PrismaModule } from '../../infra/prisma/prisma.module.js';
 import { QueueFactory } from '../../infra/queue/queue-factory.js';
-
-// Middleware runs before guards, so rejected and throttled answers are not stored either.
-function noStore(_request: Request, response: Response, next: NextFunction): void {
-  response.setHeader('Cache-Control', 'no-store');
-  next();
-}
 
 @Module({
   imports: [
@@ -46,7 +41,8 @@ function noStore(_request: Request, response: Response, next: NextFunction): voi
     AccessTokenService,
     PasswordHasher,
     AccessTokenGuard,
-    RolesGuard,
+    PermissionsGuard,
+    SessionRevocation,
     SessionsPurgeWorker,
     {
       provide: SESSIONS_QUEUE_TOKEN,
@@ -56,7 +52,7 @@ function noStore(_request: Request, response: Response, next: NextFunction): voi
     { provide: AccountsRepository, useClass: PrismaAccountsRepository },
     { provide: SessionsRepository, useClass: PrismaSessionsRepository },
   ],
-  exports: [AccessTokenGuard, RolesGuard],
+  exports: [AccessTokenGuard, PermissionsGuard, SessionRevocation],
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

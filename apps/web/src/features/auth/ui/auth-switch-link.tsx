@@ -3,6 +3,8 @@ import type * as React from 'react';
 
 import { authPageHref } from '@/shared/lib/redirect-target';
 
+import { handleKeepFieldFocus } from './keep-field-focus';
+
 interface AuthSwitchLinkProps {
   readonly prompt: string;
   readonly path: Parameters<typeof authPageHref>[0];
@@ -22,6 +24,7 @@ export function AuthSwitchLink({
       <Link
         href={authPageHref(path, next)}
         className="font-medium text-foreground underline underline-offset-4"
+        onMouseDown={handleKeepFieldFocus}
       >
         {children}
       </Link>

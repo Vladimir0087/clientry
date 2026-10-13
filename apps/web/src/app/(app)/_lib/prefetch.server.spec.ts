@@ -24,6 +24,7 @@ import {
   prefetchClientList,
   prefetchDeal,
   prefetchDealHistory,
+  prefetchFilterMembers,
   prefetchMembers,
   prefetchSession,
   prefetchStages,
@@ -43,6 +44,7 @@ import { createAccessToken } from '../../../../test/tokens';
 
 const TIME_LIMIT_MS = 1000;
 const SLACK_MS = 300;
+const OTHER_MEMBER_ID = '0199a3c4-6a7b-7c8d-9e0f-1a2b3c4d5e6f';
 
 function ok(): Response {
   return HttpResponse.json(TEST_SESSION);
@@ -169,6 +171,62 @@ describe('prefetch', () => {
     });
   });
 
+  describe('prefetchMembers', () => {
+    it('should fill the members key the client hook reads when the team page loads', async () => {
+      countRequests('/api/members', () => HttpResponse.json(TEST_MEMBERS));
+      const queryClient = createQueryClient();
+
+      await prefetchMembers(queryClient, await requestWith(await createAccessToken()));
+
+      expect(queryClient.getQueryData(memberKeys.list)).toEqual(TEST_MEMBERS);
+    });
+
+    it('should log one warning with the label when the members fail', async () => {
+      countRequests('/api/members', () => problemResponse(503, 'SERVICE_UNAVAILABLE'));
+
+      await prefetchMembers(createQueryClient(), await requestWith(await createAccessToken()));
+
+      const lines = writtenLines();
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0] ?? '')).toMatchObject({
+        level: 40,
+        msg: 'Members prefetch failed',
+      });
+    });
+  });
+
+  describe('prefetchFilterMembers', () => {
+    it('should ask for the members once when the board URL has another member id', async () => {
+      const members = countRequests('/api/members', () => HttpResponse.json(TEST_MEMBERS));
+      const filters = await loadBoardFilters(Promise.resolve({ assignee: OTHER_MEMBER_ID }));
+
+      await prefetchFilterMembers(
+        createQueryClient(),
+        await requestWith(await createAccessToken()),
+        filters.assignee,
+      );
+
+      expect(members.count).toBe(1);
+    });
+
+    it.each([
+      ['/deals', () => loadBoardFilters({})],
+      ['/tasks', () => loadTaskFilters({})],
+      ['/deals?assignee=<own id>', () => loadBoardFilters({ assignee: TEST_SESSION.user.id })],
+    ])('should ask for no members when %s has no other member id', async (_page, load) => {
+      const members = countRequests('/api/members', () => HttpResponse.json(TEST_MEMBERS));
+      const { assignee } = await load();
+
+      await prefetchFilterMembers(
+        createQueryClient(),
+        await requestWith(await createAccessToken()),
+        assignee,
+      );
+
+      expect(members.count).toBe(0);
+    });
+  });
+
   describe('prefetchClientList', () => {
     it('should fill the cache under the key the client hook builds when the URL has filters', async () => {
       const counter = countRequests('/api/clients', () => HttpResponse.json(TEST_CLIENT_LIST));
@@ -182,7 +240,7 @@ describe('prefetch', () => {
           q: '',
           sources: ['website'],
           tags: ['vip'],
-          isMine: false,
+          createdBy: null,
           sort: 'newest',
         }),
       );
@@ -270,7 +328,7 @@ describe('prefetch', () => {
       const request = await requestWith(await createAccessToken());
 
       await Promise.all([
-        prefetchBoard(queryClient, request, { isMine: false }),
+        prefetchBoard(queryClient, request, { assignee: null }),
         prefetchDeal(queryClient, request, TEST_DEAL.id),
         prefetchDealHistory(queryClient, request, TEST_DEAL.id),
         prefetchStages(queryClient, request),
@@ -278,7 +336,7 @@ describe('prefetch', () => {
         prefetchClientDeals(queryClient, request, TEST_CLIENT.id),
       ]);
 
-      expect(queryClient.getQueryData(dealKeys.board({ isMine: false }))).toEqual(board);
+      expect(queryClient.getQueryData(dealKeys.board({ assignee: null }))).toEqual(board);
       expect(queryClient.getQueryData(dealKeys.detail(TEST_DEAL.id))).toEqual(TEST_DEAL);
       expect(queryClient.getQueryData(dealKeys.history(TEST_DEAL.id))).toEqual(history);
       expect(queryClient.getQueryData(stageKeys.list)).toEqual(TEST_STAGES);
@@ -287,22 +345,27 @@ describe('prefetch', () => {
       expect(writtenLines()).toEqual([]);
     });
 
-    it('should fill the key the client hook builds when the URL has mine=true', async () => {
+    it('should fill the key the client hook builds when the URL has a member id', async () => {
+      const memberId = TEST_SESSION.user.id;
       const counter = countRequests('/api/deals/board', () => HttpResponse.json(board));
       const queryClient = createQueryClient();
-      const filters = await loadBoardFilters(Promise.resolve({ mine: 'true' }));
+      const filters = await loadBoardFilters(Promise.resolve({ assignee: memberId }));
 
       await prefetchBoard(queryClient, await requestWith(await createAccessToken()), filters);
 
-      expect(queryClient.getQueryData(dealKeys.board({ isMine: true }))).toEqual(board);
-      expect(counter.urls.map((url) => new URL(url).search)).toEqual(['?assignee=me']);
+      expect(queryClient.getQueryData(dealKeys.board({ assignee: memberId }))).toEqual(board);
+      expect(counter.urls.map((url) => new URL(url).search)).toEqual([`?assignee=${memberId}`]);
+    });
+
+    it('should filter nothing when the URL still has the old mine=true', async () => {
+      expect(await loadBoardFilters(Promise.resolve({ mine: 'true' }))).toEqual({ assignee: null });
     });
 
     it('should log one warning with the label when the board fails', async () => {
       countRequests('/api/deals/board', () => problemResponse(503, 'SERVICE_UNAVAILABLE'));
 
       await prefetchBoard(createQueryClient(), await requestWith(await createAccessToken()), {
-        isMine: false,
+        assignee: null,
       });
 
       const lines = writtenLines();
@@ -346,7 +409,7 @@ describe('prefetch', () => {
 
       await prefetchTaskList(queryClient, await requestWith(await createAccessToken()), filters);
 
-      const key = taskKeys.list({ isMine: false, status: 'done' });
+      const key = taskKeys.list({ assignee: null, status: 'done' });
       expect(queryClient.getQueryData(key)).toEqual(asInfinite(page));
       expect(counter.urls.map((url) => new URL(url).search)).toEqual(['?status=done']);
     });
@@ -361,7 +424,7 @@ describe('prefetch', () => {
         await loadTaskFilters({}),
       );
 
-      expect(queryClient.getQueryData(taskKeys.list({ isMine: true, status: 'open' }))).toEqual(
+      expect(queryClient.getQueryData(taskKeys.list({ assignee: 'me', status: 'open' }))).toEqual(
         asInfinite(page),
       );
       expect(counter.urls.map((url) => new URL(url).search)).toEqual(['?assignee=me']);

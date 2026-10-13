@@ -3,13 +3,24 @@ import userEvent from '@testing-library/user-event';
 import { delay, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
+import { memberKeys } from '@/entities/member';
+import { createQueryClient } from '@/shared/api/query-client';
+
 import { TasksView } from './tasks-view';
 import { OTHER_USER } from '../../../../../test/clients';
+import { TEST_MEMBERS } from '../../../../../test/deals';
 import { failOnceThenWait } from '../../../../../test/msw/fail-once';
 import { recordRequests } from '../../../../../test/msw/record';
 import type { Resolver } from '../../../../../test/msw/record';
 import { renderWithUrl } from '../../../../../test/render';
 import { CLIENT_RELATED, makeTask, makeTaskPage, TEST_TASK } from '../../../../../test/tasks';
+
+const OTHER_MEMBER = {
+  ...OTHER_USER,
+  email: 'max@example.com',
+  role: 'manager',
+  joinedAt: '2026-10-02T09:00:00.000Z',
+} as const;
 
 function answerList(resolver: Resolver): Request[] {
   return recordRequests('get', '/api/tasks', resolver);
@@ -32,15 +43,12 @@ describe('TasksView', () => {
     expect(screen.getByTestId('task-list-skeleton')).toBeInTheDocument();
   });
 
-  it('should press Only mine and Open and ask for my open tasks when the URL has no filters', async () => {
+  it('should read Assignee: Me and Open and ask for my open tasks when the URL has no filters', async () => {
     const requests = answerList(() => HttpResponse.json(makeTaskPage([TEST_TASK])));
 
     renderWithUrl(<TasksView />);
 
-    expect(screen.getByRole('button', { name: 'Only mine' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: 'Assignee: Me' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open' })).toHaveAttribute('aria-pressed', 'true');
     expect(await screen.findByRole('link', { name: TEST_TASK.title })).toHaveAttribute(
       'href',
@@ -49,16 +57,13 @@ describe('TasksView', () => {
     expect(searchOf(requests[0])).toBe('?assignee=me');
   });
 
-  it('should turn Only mine off and show assignees when the URL has assignee=anyone', async () => {
+  it('should read Anyone, send no assignee and show assignees when the URL has assignee=anyone', async () => {
     const task = makeTask(2, { assignee: OTHER_USER, related: CLIENT_RELATED });
     const requests = answerList(() => HttpResponse.json(makeTaskPage([task])));
 
     renderWithUrl(<TasksView />, '?assignee=anyone');
 
-    expect(screen.getByRole('button', { name: 'Only mine' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
+    expect(screen.getByRole('button', { name: 'Assignee: Anyone' })).toBeInTheDocument();
     await screen.findByRole('link', { name: task.title });
     expect(screen.getByText(OTHER_USER.name)).toHaveTextContent(`Assigned to ${OTHER_USER.name}`);
     expect(screen.getByRole('link', { name: `Client ${CLIENT_RELATED.name}` })).toHaveAttribute(
@@ -104,7 +109,8 @@ describe('TasksView', () => {
     const user = userEvent.setup();
     const { urlUpdates } = renderWithUrl(<TasksView />, '?assignee=anyone&status=done');
 
-    await user.click(screen.getByRole('button', { name: 'Only mine' }));
+    await user.click(screen.getByRole('button', { name: 'Assignee: Anyone' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Me' }));
     await user.click(screen.getByRole('button', { name: 'Open' }));
 
     await waitFor(() => {
@@ -113,7 +119,7 @@ describe('TasksView', () => {
     expect(urlUpdates.every((update) => update.options.history === 'replace')).toBe(true);
   });
 
-  it('should say nothing is assigned and leave focus on Only mine when everyone is shown from the empty state', async () => {
+  it('should say nothing is assigned and focus the menu on Anyone when everyone is shown from the empty state', async () => {
     answerList(() => HttpResponse.json(makeTaskPage([])));
     const user = userEvent.setup();
     const { urlUpdates } = renderWithUrl(<TasksView />);
@@ -121,10 +127,49 @@ describe('TasksView', () => {
     expect(await screen.findByText('No open tasks are assigned to you.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: "Show everyone's tasks" }));
 
-    const toggle = screen.getByRole('button', { name: 'Only mine' });
-    expect(toggle).toHaveFocus();
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Assignee: Anyone' })).toHaveFocus();
     expect(urlUpdates.at(-1)?.queryString).toBe('?assignee=anyone');
+  });
+
+  it('should send the member id and hide the assignee on rows when the URL has a member', async () => {
+    const task = makeTask(4, { assignee: OTHER_USER });
+    const requests = answerList(() => HttpResponse.json(makeTaskPage([task])));
+
+    renderWithUrl(<TasksView />, `?assignee=${OTHER_USER.id}`);
+
+    await screen.findByRole('link', { name: task.title });
+    expect(within(screen.getByRole('list')).queryByText(OTHER_USER.name)).not.toBeInTheDocument();
+    expect(searchOf(requests[0])).toBe(`?assignee=${OTHER_USER.id}`);
+  });
+
+  it('should ask for the members on mount and name the member on the menu when the URL has a member and none are cached', async () => {
+    answerList(() => HttpResponse.json(makeTaskPage([makeTask(4, { assignee: OTHER_USER })])));
+    const memberRequests = recordRequests('get', '/api/members', () =>
+      HttpResponse.json({ items: [...TEST_MEMBERS.items, { ...OTHER_MEMBER }] }),
+    );
+
+    renderWithUrl(<TasksView />, `?assignee=${OTHER_USER.id}`);
+
+    expect(
+      await screen.findByRole('button', { name: `Assignee: ${OTHER_USER.name}` }),
+    ).toBeInTheDocument();
+    expect(memberRequests).toHaveLength(1);
+  });
+
+  it.each([
+    [OTHER_USER.id, `No open tasks are assigned to ${OTHER_USER.name}.`],
+    ['0199a3c4-0000-7000-8000-000000000000', 'No open tasks are assigned to this member.'],
+  ])('should name whose tasks are missing when the URL has assignee=%s', async (id, text) => {
+    answerList(() => HttpResponse.json(makeTaskPage([])));
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(memberKeys.list, {
+      items: [...TEST_MEMBERS.items, { ...OTHER_MEMBER }],
+    });
+
+    renderWithUrl(<TasksView />, `?assignee=${id}`, queryClient);
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "Show everyone's tasks" })).toBeInTheDocument();
   });
 
   it.each([

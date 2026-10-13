@@ -3,11 +3,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Board, BoardQuery, Deal, MoveDealRequest, Stage } from '@clientry/shared/deals';
 
 import { positionBetween } from './deal-position.js';
+import { referenceErrors } from './deal-references.js';
 import { DealsRepository } from './deals.repository.js';
 import type { DealPlacement, DealsTransaction } from './deals.repository.js';
 import { BoardChangedError, DealChangedError, DealNotFoundError } from './errors.js';
 import { staleDealError } from './stale-deal.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
+import { RequestValidationError } from '../../common/errors/request-validation.error.js';
 
 // Entering won or lost closes the deal now; staying in the same closed stage keeps the date.
 function closedAtFor(deal: Deal, target: Stage): Date | null {
@@ -20,15 +22,32 @@ function closedAtFor(deal: Deal, target: Stage): Date | null {
   return new Date();
 }
 
+// A reopened deal is open work again, so it must not land on a removed member. Read FOR SHARE
+// before the deal write: a removal waits for the move and then hands the deal over.
+async function assertAssigneeOnReopen(
+  deals: DealsTransaction,
+  workspaceId: string,
+  current: Deal,
+  placement: DealPlacement,
+): Promise<void> {
+  if (current.closedAt === null || placement.closedAt !== null) {
+    return;
+  }
+  const member = await deals.findMember(workspaceId, current.assignee.id);
+  if (!member) {
+    throw new RequestValidationError(referenceErrors({ assigneeId: member }));
+  }
+}
+
 @Injectable()
 export class DealMovesService {
   private readonly logger = new Logger(DealMovesService.name);
 
   constructor(private readonly deals: DealsRepository) {}
 
-  // "Mine" means assigned to the caller, not created by them.
+  // The board filters by assignee, not by creator.
   async board(user: AuthUser, query: BoardQuery): Promise<Board> {
-    const assigneeId = query.assignee === 'me' ? user.id : undefined;
+    const assigneeId = query.assignee === 'me' ? user.id : query.assignee;
     return { columns: await this.deals.board(user.workspaceId, { assigneeId }) };
   }
 
@@ -40,6 +59,7 @@ export class DealMovesService {
         throw new DealNotFoundError();
       }
       const placement = await this.placementFor(deals, workspaceId, current, input);
+      await assertAssigneeOnReopen(deals, workspaceId, current, placement);
       const moved = await deals.move(workspaceId, id, input.version, placement);
       if (!moved) {
         throw await staleDealError(deals, workspaceId, id);

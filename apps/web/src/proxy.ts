@@ -6,6 +6,7 @@ import type { NextRequest } from 'next/server';
 import { NONCE_HEADER } from '@/shared/lib/nonce';
 import {
   isAuthPath,
+  isPublicPath,
   loginPath,
   NEXT_PARAM,
   resolveRedirectTarget,
@@ -53,6 +54,9 @@ function redirectTo(request: NextRequest, path: string): NextResponse {
 // Sends the user where they belong; the API, not this gate, authorizes every call.
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname, search, searchParams, origin } = request.nextUrl;
+  if (isPublicPath(pathname)) {
+    return render(request);
+  }
   const session = await verifyAccessToken(request.cookies.get(ACCESS_TOKEN_COOKIE)?.value);
   if (isAuthPath(pathname)) {
     return session.status === 'authenticated'

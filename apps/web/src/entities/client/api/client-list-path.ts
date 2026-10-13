@@ -16,8 +16,8 @@ export function clientListPath(filters: ClientFilters, cursor: string | null): A
   for (const tag of filters.tags) {
     params.append('tag', tag);
   }
-  if (filters.isMine) {
-    params.set('createdBy', 'me');
+  if (filters.createdBy !== null) {
+    params.set('createdBy', filters.createdBy);
   }
   if (filters.sort !== DEFAULT_CLIENT_FILTERS.sort) {
     params.set('sort', filters.sort);

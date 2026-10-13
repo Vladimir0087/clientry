@@ -7,7 +7,7 @@ import { useClientFilters } from './use-client-filters';
 
 describe('useClientFilters', () => {
   it('should read the same filters as the server loader when the URL has filters', async () => {
-    const search = { q: ' acme ', source: 'website,telegram', tags: 'VIP,warm', mine: 'true' };
+    const search = { q: ' acme ', source: 'website,telegram', tags: 'VIP,warm', createdBy: 'me' };
 
     const { result } = renderHook(() => useClientFilters(), {
       wrapper: withNuqsTestingAdapter({ searchParams: search }),

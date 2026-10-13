@@ -7,6 +7,7 @@ import type * as React from 'react';
 import { useStages } from '@/entities/deal';
 import { useSession } from '@/entities/session';
 import { RetryMessage } from '@/shared/ui/retry-message';
+import { hasPermission } from '@clientry/shared/auth';
 import type { MemberRole } from '@clientry/shared/auth';
 import type { StageListItem } from '@clientry/shared/deals';
 
@@ -124,11 +125,11 @@ function StageList({ stages, role, headingId }: StageListProps): React.JSX.Eleme
   const { deleting, focusHeading, handleDelete, handleClose, handleReturnFocus } =
     useStageDeleting(headingId);
   const openStages = openStagesOf(stages);
-  const isOwner = role === 'owner';
+  const canManage = role !== undefined && hasPermission(role, 'stages.manage');
 
   return (
     <div className="flex flex-col gap-6">
-      {role === 'manager' && (
+      {role !== undefined && !canManage && (
         <p className="text-sm text-muted-foreground">Only owners can change stages.</p>
       )}
       <ol className="flex max-w-3xl flex-col divide-y rounded-lg border">
@@ -136,7 +137,7 @@ function StageList({ stages, role, headingId }: StageListProps): React.JSX.Eleme
           <StageRow
             key={stage.id}
             stage={stage}
-            controls={isOwner ? controlsFor(stage, openStages) : null}
+            controls={canManage ? controlsFor(stage, openStages) : null}
             focusRequest={rowFocusRequest}
             onFocusDone={handleFocusDone}
             onMove={handleMove}
@@ -145,7 +146,7 @@ function StageList({ stages, role, headingId }: StageListProps): React.JSX.Eleme
           />
         ))}
       </ol>
-      {isOwner && <AddStageForm openCount={openStages.length} onLimitReached={focusHeading} />}
+      {canManage && <AddStageForm openCount={openStages.length} onLimitReached={focusHeading} />}
       {deleting !== null && (
         <DeleteStageDialog
           stage={liveStage(stages, deleting)}
@@ -158,7 +159,7 @@ function StageList({ stages, role, headingId }: StageListProps): React.JSX.Eleme
   );
 }
 
-// Controls appear once the session says the viewer is the owner; the API checks the role again.
+// Controls appear once the session grants stages.manage; the API checks the role again.
 export function StageManager({ headingId }: { readonly headingId: string }): React.JSX.Element {
   const stages = useStages();
   const session = useSession();

@@ -44,7 +44,7 @@ import {
 import { StagesService } from './stages.service.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
-import { Roles } from '../../common/auth/roles.decorator.js';
+import { RequirePermission } from '../../common/auth/require-permission.decorator.js';
 import { UntrustedOriginError } from '../../common/guards/untrusted-origin.error.js';
 import {
   ApiErrorResponse,
@@ -57,10 +57,10 @@ const COLLECTION = '/api/stages';
 const ORDER = '/api/stages/order';
 const ITEM = '/api/stages/0199a3c4-6f70-7a81-9b2c-3d4e5f6a7b8c';
 
-// The role guard answers a manager with 403 before the handler runs.
-function OwnerOnly(instance: string): MethodDecorator {
+// The permission guard answers a manager with 403 before the handler runs.
+function ManageStages(instance: string): MethodDecorator {
   return applyDecorators(
-    Roles('owner'),
+    RequirePermission('stages.manage'),
     ApiErrorResponse(
       HttpStatus.FORBIDDEN,
       instance,
@@ -88,7 +88,7 @@ export class StagesController {
   }
 
   @Post()
-  @OwnerOnly(COLLECTION)
+  @ManageStages(COLLECTION)
   @ApiOperation({ summary: 'Add an open stage before won and lost' })
   @ResponseSchema(HttpStatus.CREATED, stageSchema)
   @ApiInvalidRequest(COLLECTION, 'name', 'Enter a stage name')
@@ -106,7 +106,7 @@ export class StagesController {
   }
 
   @Put('order')
-  @OwnerOnly(ORDER)
+  @ManageStages(ORDER)
   @ApiOperation({ summary: 'Reorder the open stages; the list must hold every one of them' })
   @ResponseSchema(HttpStatus.OK, stageListResponseSchema)
   @ApiInvalidRequest(ORDER, 'ids.1', 'Stages must be unique')
@@ -119,7 +119,7 @@ export class StagesController {
   }
 
   @Patch(':id')
-  @OwnerOnly(ITEM)
+  @ManageStages(ITEM)
   @ApiOperation({ summary: 'Rename a stage' })
   @ResponseSchema(HttpStatus.OK, stageSchema)
   @ApiInvalidRequest(ITEM, 'name', 'Use at most 50 characters')
@@ -135,7 +135,7 @@ export class StagesController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @OwnerOnly(ITEM)
+  @ManageStages(ITEM)
   @ApiOperation({ summary: 'Delete an open stage, moving its deals to another open stage' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Deleted' })
   @ApiInvalidRequest(ITEM, 'moveDealsTo', 'Choose another open stage')

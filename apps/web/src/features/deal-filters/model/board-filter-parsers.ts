@@ -1,21 +1,17 @@
-import { createLoader, createParser } from 'nuqs/server';
+import { createLoader } from 'nuqs/server';
 import type { SearchParams } from 'nuqs/server';
 
 import type { BoardFilters } from '@/entities/deal';
-
-// Only the exact "true" turns the filter on; any other value reads as off.
-const mineParser = createParser<boolean>({
-  parse: (query) => (query === 'true' ? true : null),
-  serialize: () => 'true',
-});
+import { memberFilterParser } from '@/entities/member';
+import type { MemberFilter } from '@clientry/shared/workspaces';
 
 // Imported from nuqs/server, which has no 'use client', so the server page parses the same way.
 export const boardFilterParsers = {
-  mine: mineParser.withDefault(false),
+  assignee: memberFilterParser,
 };
 
-export function toBoardFilters(values: { readonly mine: boolean }): BoardFilters {
-  return { isMine: values.mine };
+export function toBoardFilters(values: { readonly assignee: MemberFilter | null }): BoardFilters {
+  return { assignee: values.assignee };
 }
 
 const loadFilterValues = createLoader(boardFilterParsers);

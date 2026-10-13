@@ -61,7 +61,8 @@ function ApiDeleteForbidden(instance: string): MethodDecorator {
   );
 }
 
-// The role rule runs in the service after the client is found, so no route carries @Roles.
+// The delete rule runs in the service after the client is found, so no route carries
+// @RequirePermission.
 @ApiTags('clients')
 @ApiErrorResponse(HttpStatus.UNAUTHORIZED, COLLECTION, new AuthenticationRequiredError())
 @Controller('clients')

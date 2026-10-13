@@ -1,9 +1,10 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import type * as React from 'react';
 
-import { useMoveDeal, useStages } from '@/entities/deal';
+import { editDealPath, useMoveDeal, useStages } from '@/entities/deal';
 import { isFocusStranded } from '@/shared/lib/is-focus-stranded';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Spinner } from '@/shared/ui/spinner';
@@ -22,7 +23,10 @@ function withCurrentStage(stages: readonly Stage[], current: Stage): readonly St
 // Moves the deal to the top of the chosen stage, as the card menu does.
 export function DealStageSelect({ deal, labelId }: DealStageSelectProps): React.JSX.Element {
   const stages = useStages();
-  const move = useMoveDeal('page');
+  const router = useRouter();
+  const move = useMoveDeal('page', (dealId) => {
+    router.push(editDealPath(dealId));
+  });
   const { isPending } = move;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const shouldRefocusRef = useRef(false);

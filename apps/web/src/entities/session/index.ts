@@ -1,4 +1,4 @@
 export { logout } from './api/session-api';
-export { roleLabel } from './model/role-label';
+export { handleInsufficientRole } from './model/insufficient-role';
 export { sessionKeys } from './model/session-keys';
 export { useSession } from './model/use-session';

@@ -4,6 +4,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { delay, HttpResponse } from 'msw';
 import type * as React from 'react';
+import { toast } from 'sonner';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { dealKeys, useBoard } from '@/entities/deal';
@@ -21,6 +22,7 @@ import {
   WON_STAGE,
 } from '../../../../test/deals';
 import { held } from '../../../../test/held';
+import { mockRouter } from '../../../../test/mocks/router';
 import { problemResponse } from '../../../../test/msw/problem';
 import { recordRequests } from '../../../../test/msw/record';
 import type { Resolver } from '../../../../test/msw/record';
@@ -28,7 +30,7 @@ import { renderWithProviders } from '../../../../test/render';
 
 const DEAL = makeDeal(1, { stage: NEW_STAGE, version: 3 });
 const BOARD = makeBoard([DEAL]);
-const FILTERS = { isMine: false };
+const FILTERS = { assignee: null };
 const HEADING_ID = 'deals-heading';
 const CHANGED_MESSAGE = 'This deal was changed by someone else. The board is updated.';
 
@@ -385,6 +387,61 @@ describe('DealBoard', () => {
 
   describe('failed moves', () => {
     const OTHER = makeDeal(2, { stage: NEW_STAGE, version: 1 });
+
+    function answerAssigneeGone(): void {
+      answerMove(() =>
+        problemResponse(400, 'VALIDATION_FAILED', {
+          errors: [{ path: 'assigneeId', message: 'Choose a member' }],
+        }),
+      );
+      recordRequests('get', '/api/deals/board', () => HttpResponse.json(BOARD));
+    }
+
+    it('should put the card back and offer to edit the deal when its assignee is no longer a member', async () => {
+      answerAssigneeGone();
+      const user = userEvent.setup();
+      renderBoard();
+
+      await moveFromMenu(user, 'Call');
+      // A plain click: user-event's focus change hands sonner a relatedTarget jsdom cannot focus.
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit deal' }));
+
+      expect(cardIn('New')).toBeInTheDocument();
+      expect(mockRouter.push).toHaveBeenCalledWith(`/deals/${DEAL.id}/edit`);
+    });
+
+    it('should drop Edit deal from the toast when a later move fails for another reason', async () => {
+      answerAssigneeGone();
+      const user = userEvent.setup();
+      renderBoard();
+      await moveFromMenu(user, 'Call');
+      await screen.findByRole('button', { name: 'Edit deal' });
+      answerMove(() => problemResponse(500, 'INTERNAL_SERVER_ERROR'));
+
+      await moveFromMenu(user, 'Call');
+
+      expect(await screen.findByText('Could not move the deal. Try again.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Edit deal' })).not.toBeInTheDocument();
+    });
+
+    it('should keep the Edit deal toast for 10 seconds when its assignee is no longer a member', async () => {
+      const showError = vi.spyOn(toast, 'error');
+      onTestFinished(() => {
+        showError.mockRestore();
+      });
+      answerAssigneeGone();
+      const user = userEvent.setup();
+      renderBoard();
+
+      await moveFromMenu(user, 'Call');
+
+      await waitFor(() => {
+        expect(showError).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ duration: 10_000 }),
+        );
+      });
+    });
 
     it('should keep a queued move of another card in place when an earlier move fails', async () => {
       const first = held();

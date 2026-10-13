@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { DealHandover } from './deal-handover.repository.js';
 import { DealMovesService } from './deal-moves.service.js';
 import { DealsController } from './deals.controller.js';
 import { DealsRepository } from './deals.repository.js';
@@ -18,8 +19,10 @@ import { PrismaModule } from '../../infra/prisma/prisma.module.js';
     DealsService,
     DealMovesService,
     StagesService,
+    DealHandover,
     { provide: DealsRepository, useClass: PrismaDealsRepository },
     { provide: StagesRepository, useClass: PrismaStagesRepository },
   ],
+  exports: [DealHandover],
 })
 export class DealsModule {}

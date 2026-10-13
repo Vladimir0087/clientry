@@ -60,21 +60,23 @@ enum NotificationType {
 }
 
 model User {
-  id            String         @id @default(uuid(7)) @db.Uuid
-  email         String         @unique
-  passwordHash  String         @map("password_hash")
-  name          String
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
-  membership    Membership?
-  sessions      Session[]
-  clients       Client[]
-  createdDeals  Deal[]         @relation("DealCreatedBy")
-  assignedDeals Deal[]         @relation("DealAssignee")
-  activities    Activity[]
-  createdTasks  Task[]         @relation("TaskCreatedBy")
-  assignedTasks Task[]         @relation("TaskAssignee")
-  notifications Notification[]
+  id             String         @id @default(uuid(7)) @db.Uuid
+  email          String         @unique
+  passwordHash   String         @map("password_hash")
+  name           String
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  membership     Membership?
+  sessions       Session[]
+  clients        Client[]
+  createdDeals   Deal[]         @relation("DealCreatedBy")
+  assignedDeals  Deal[]         @relation("DealAssignee")
+  activities     Activity[]
+  createdTasks   Task[]         @relation("TaskCreatedBy")
+  assignedTasks  Task[]         @relation("TaskAssignee")
+  notifications  Notification[]
+  createdInvites Invite[]       @relation("InviteCreatedBy")
+  usedInvites    Invite[]       @relation("InviteUsedBy")
 
   @@map("users")
 }
@@ -91,6 +93,7 @@ model Workspace {
   activities    Activity[]
   tasks         Task[]
   notifications Notification[]
+  invites       Invite[]
 
   @@map("workspaces")
 }
@@ -107,6 +110,27 @@ model Membership {
 
   @@index([workspaceId])
   @@map("memberships")
+}
+
+// No role: every invite joins as a manager.
+model Invite {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  createdById String    @map("created_by_id") @db.Uuid
+  tokenHash   Bytes     @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt      DateTime? @map("used_at") @db.Timestamptz(3)
+  usedById    String?   @map("used_by_id") @db.Uuid
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation("InviteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  usedBy      User?     @relation("InviteUsedBy", fields: [usedById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt])
+  @@index([createdById])
+  @@index([usedById])
+  @@map("invites")
 }
 
 model Stage {

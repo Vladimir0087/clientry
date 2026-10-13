@@ -9,6 +9,8 @@ import type { TestApp } from '../../../test/create-test-app.js';
 import { uniqueEmail } from '../../../test/fixtures/accounts.js';
 
 const LOGIN_LIMIT = 10;
+const PREVIEW_LIMIT = 30;
+const UNKNOWN_TOKEN = 'q3V8Hn1xKZ0bWcR5tYp2LmA9sEoJfDgU7iNvXwC4hBk';
 
 // Each test gets its own app: the throttler counts in memory for the life of the app.
 describe('auth rate limit', () => {
@@ -66,6 +68,32 @@ describe('auth rate limit', () => {
     await exhaustLogins(app, '203.0.113.1');
 
     const response = await failLogin(app, '203.0.113.2');
+
+    expect(response.status).toBe(429);
+  });
+
+  it('should answer 429 with Retry-After when the 31st invite preview comes within a minute', async () => {
+    const app = await startApp(0);
+    const http = agent(app.app.getHttpServer());
+    for (let attempt = 0; attempt < PREVIEW_LIMIT; attempt += 1) {
+      await http.post('/api/auth/invite/preview').send({ token: UNKNOWN_TOKEN }).expect(404);
+    }
+
+    const response = await http.post('/api/auth/invite/preview').send({ token: UNKNOWN_TOKEN });
+
+    expect(response.status).toBe(429);
+    expect(Number(response.headers['retry-after'])).toBeGreaterThan(0);
+  });
+
+  it('should answer 429 when the 11th login by invite comes within a minute', async () => {
+    const app = await startApp(0);
+    const http = agent(app.app.getHttpServer());
+    const body = { token: UNKNOWN_TOKEN, email: uniqueEmail(), password: 'wrong password' };
+    for (let attempt = 0; attempt < LOGIN_LIMIT; attempt += 1) {
+      await http.post('/api/auth/invite/login').send(body).expect(404);
+    }
+
+    const response = await http.post('/api/auth/invite/login').send(body);
 
     expect(response.status).toBe(429);
   });

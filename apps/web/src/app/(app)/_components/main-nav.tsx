@@ -8,6 +8,7 @@ import type * as React from 'react';
 
 import { CLIENTS_PATH } from '@/entities/client';
 import { DEALS_PATH } from '@/entities/deal';
+import { TEAM_PATH } from '@/entities/member';
 import { TASKS_PATH } from '@/entities/task';
 
 interface NavItem {
@@ -19,6 +20,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: CLIENTS_PATH, label: 'Clients' },
   { href: DEALS_PATH, label: 'Deals' },
   { href: TASKS_PATH, label: 'Tasks' },
+  { href: TEAM_PATH, label: 'Team' },
 ];
 
 function isCurrent(pathname: string, href: string): boolean {

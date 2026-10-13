@@ -61,7 +61,8 @@ function ApiDeleteForbidden(instance: string): MethodDecorator {
   );
 }
 
-// The delete rule runs in the service after the task is found, so no route carries @Roles.
+// The delete rule runs in the service after the task is found, so no route carries
+// @RequirePermission.
 @ApiTags('tasks')
 @ApiErrorResponse(HttpStatus.UNAUTHORIZED, COLLECTION, new AuthenticationRequiredError())
 @Controller('tasks')

@@ -8,7 +8,7 @@ describe('loadClientFilters', () => {
       q: 'acme',
       source: 'website,telegram',
       tags: 'vip',
-      mine: 'true',
+      createdBy: 'me',
       sort: 'name_asc',
     });
 
@@ -16,7 +16,7 @@ describe('loadClientFilters', () => {
       q: 'acme',
       sources: ['telegram', 'website'],
       tags: ['vip'],
-      isMine: true,
+      createdBy: 'me',
       sort: 'name_asc',
     });
   });

@@ -102,6 +102,18 @@ describe('proxy', () => {
     });
   });
 
+  describe('join page', () => {
+    it.each<SessionKind>(['anonymous', 'expired', 'authenticated'])(
+      'should render /join without a redirect when the session is %s',
+      async (kind) => {
+        const response = await run(kind, '/join');
+
+        expect(isRendered(response)).toBe(true);
+        expect(redirectTarget(response)).toBeNull();
+      },
+    );
+  });
+
   describe('content security policy', () => {
     it('should forward the nonce of its policy to rendering when a page renders', async () => {
       const response = await run('authenticated', '/');

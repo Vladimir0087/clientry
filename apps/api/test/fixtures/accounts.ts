@@ -9,9 +9,10 @@ import {
   sessionResponseSchema,
 } from '@clientry/shared/auth';
 import type { SessionResponse } from '@clientry/shared/auth';
+import { INVITE_LIMITS } from '@clientry/shared/workspaces';
 
+import { generateOpaqueToken, hashOpaqueToken } from '../../src/common/crypto/opaque-token.js';
 import { PrismaService } from '../../src/infra/prisma/prisma.service.js';
-import { PasswordHasher } from '../../src/modules/auth/password-hasher.js';
 import type { TestApp } from '../create-test-app.js';
 import { setCookieValue } from '../support/set-cookies.js';
 
@@ -53,23 +54,29 @@ export async function registerAccount(
   return toTestAccount(http, email, response);
 }
 
-// Inserted directly until invites exist; the login still goes through the API.
+// Callers pass only the workspace id, so the invite is inserted directly; the join uses the API.
 export async function addManager(testApp: TestApp, workspaceId: string): Promise<TestAccount> {
-  const passwordHash = await testApp.app.get(PasswordHasher).hash(TEST_PASSWORD);
-  const email = uniqueEmail('manager');
-  await testApp.app.get(PrismaService).user.create({
+  const prisma = testApp.app.get(PrismaService);
+  const owner = await prisma.membership.findFirstOrThrow({
+    where: { workspaceId, role: 'owner' },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: { userId: true },
+  });
+  const token = generateOpaqueToken();
+  await prisma.invite.create({
     data: {
-      email,
-      passwordHash,
-      name: 'Max',
-      membership: { create: { workspaceId, role: 'manager' } },
+      workspaceId,
+      createdById: owner.userId,
+      tokenHash: hashOpaqueToken(token),
+      expiresAt: new Date(Date.now() + INVITE_LIMITS.lifetimeMs),
     },
   });
   const http = agent(testApp.app.getHttpServer());
+  const email = uniqueEmail('manager');
   const response = await http
-    .post('/api/auth/login')
-    .send({ email, password: TEST_PASSWORD })
-    .expect(200);
+    .post('/api/auth/invite/register')
+    .send({ token, email, password: TEST_PASSWORD, name: 'Max' })
+    .expect(201);
   return toTestAccount(http, email, response);
 }
 

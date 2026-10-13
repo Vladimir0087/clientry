@@ -24,8 +24,8 @@ import { renderWithProviders } from '../../../../test/render';
 const CLIENT_PATH = `/api/clients/${TEST_CLIENT.id}`;
 const MANAGER_SESSION = { ...TEST_SESSION, role: 'manager' as const };
 const OTHERS_CLIENT: Client = { ...TEST_CLIENT, createdBy: OTHER_USER };
-const OPEN_TASKS: TaskFilters = { isMine: true, status: 'open' };
-const CLIENT_TASKS: TaskFilters = { isMine: false, status: 'open', clientId: TEST_CLIENT.id };
+const OPEN_TASKS: TaskFilters = { assignee: 'me', status: 'open' };
+const CLIENT_TASKS: TaskFilters = { assignee: null, status: 'open', clientId: TEST_CLIENT.id };
 const NO_TASKS = { pages: [{ items: [], nextCursor: null }], pageParams: [null] };
 
 function ClientList(): React.JSX.Element | null {
@@ -126,7 +126,7 @@ describe('DeleteClientButton', () => {
       HttpResponse.json({ items: [], nextCursor: null }),
     );
     const queryClient = createQueryClient();
-    queryClient.setQueryData(dealKeys.board({ isMine: false }), makeBoard([]));
+    queryClient.setQueryData(dealKeys.board({ assignee: null }), makeBoard([]));
     queryClient.setQueryData(dealKeys.byClient(TEST_CLIENT.id), { items: [], hasMore: false });
     queryClient.setQueryData(stageKeys.list, TEST_STAGES);
     queryClient.setQueryData(taskKeys.list(CLIENT_TASKS), NO_TASKS);
@@ -141,7 +141,7 @@ describe('DeleteClientButton', () => {
     );
 
     await waitFor(() => {
-      expect(queryClient.getQueryState(dealKeys.board({ isMine: false }))?.isInvalidated).toBe(
+      expect(queryClient.getQueryState(dealKeys.board({ assignee: null }))?.isInvalidated).toBe(
         true,
       );
     });

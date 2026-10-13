@@ -1,8 +1,10 @@
 'use client';
 
-import { CheckIcon, XIcon } from 'lucide-react';
+import { XIcon } from 'lucide-react';
 import type * as React from 'react';
 
+import { MemberFilterMenu } from '@/entities/member';
+import { useSession } from '@/entities/session';
 import { Button } from '@/shared/ui/button';
 
 import { SourceMenu, SortMenu, TagsMenu } from './filter-menus';
@@ -21,23 +23,19 @@ export function ClientFiltersToolbar({
   onClear,
 }: ClientFiltersToolbarProps): React.JSX.Element {
   const { filters } = state;
-  const handleMineToggle = (): void => {
-    state.setMine(!filters.isMine);
-  };
+  const session = useSession();
   return (
     <div role="search" className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <SearchField value={filters.q} onSearch={state.setSearch} inputRef={searchRef} />
       <div className="flex flex-wrap items-center gap-2">
         <SourceMenu selected={filters.sources} onChange={state.setSources} />
         <TagsMenu selected={filters.tags} onChange={state.setTags} />
-        <Button
-          variant={filters.isMine ? 'secondary' : 'outline'}
-          aria-pressed={filters.isMine}
-          onClick={handleMineToggle}
-        >
-          {filters.isMine && <CheckIcon aria-hidden="true" />}
-          Only mine
-        </Button>
+        <MemberFilterMenu
+          label="Added by"
+          value={filters.createdBy}
+          currentUserId={session.data?.user.id}
+          onChange={state.setCreatedBy}
+        />
         <SortMenu value={filters.sort} onChange={state.setSort} />
         {state.hasActiveFilters && (
           <Button variant="ghost" onClick={onClear}>

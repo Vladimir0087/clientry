@@ -49,7 +49,57 @@ export async function holdTransaction(
   };
 }
 
-export async function waitForLockWaiter(prisma: PrismaService): Promise<void> {
+export interface SteppedTransaction<T> {
+  readonly result: Promise<T>;
+  proceed(): void;
+}
+
+// The first step's locks stay held until proceed(), then the second step runs in the same transaction.
+export async function holdSteppedTransaction<T>(
+  prisma: PrismaService,
+  first: (tx: Prisma.TransactionClient) => Promise<unknown>,
+  second: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<SteppedTransaction<T>> {
+  const held = Promise.withResolvers<undefined>();
+  const proceed = Promise.withResolvers<undefined>();
+  const result = prisma.$transaction(
+    async (tx) => {
+      await first(tx);
+      held.resolve(undefined);
+      await proceed.promise;
+      return second(tx);
+    },
+    { timeout: 20_000 },
+  );
+  onTestFinished(async () => {
+    proceed.resolve(undefined);
+    await Promise.allSettled([result]);
+  });
+  await Promise.race([held.promise, result]);
+  return {
+    result,
+    proceed: () => {
+      proceed.resolve(undefined);
+    },
+  };
+}
+
+// Waits for a statement queued behind the given backend's locks, not behind locks it waited on before.
+export async function waitForBlockedBy(prisma: PrismaService, blockerPid: number): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const [row] = await prisma.$queryRaw<WaiterCount[]>`
+          SELECT count(*)::int AS count FROM pg_stat_activity
+          WHERE ${blockerPid}::int = ANY(pg_blocking_pids(pid))`;
+        return row?.count ?? 0;
+      },
+      { timeout: WAITER_TIMEOUT_MS },
+    )
+    .toBe(1);
+}
+
+export async function waitForLockWaiter(prisma: PrismaService, count = 1): Promise<void> {
   await expect
     .poll(
       async () => {
@@ -60,5 +110,5 @@ export async function waitForLockWaiter(prisma: PrismaService): Promise<void> {
       },
       { timeout: WAITER_TIMEOUT_MS },
     )
-    .toBe(1);
+    .toBe(count);
 }

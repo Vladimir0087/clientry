@@ -22,3 +22,10 @@ export function isForbidden(error: unknown): boolean {
 export function hasErrorCode(error: unknown, code: string): boolean {
   return error instanceof ApiError && error.code === code;
 }
+
+// The message of a 400 on one field, for a request whose form does not show that field.
+export function fieldErrorMessage(error: unknown, path: string): string | undefined {
+  return error instanceof ApiError
+    ? error.errors.find((item) => item.path === path)?.message
+    : undefined;
+}

@@ -10,9 +10,18 @@ import { useClientList } from '@/entities/client';
 import { ClientFiltersToolbar } from './client-filters-toolbar';
 import { SEARCH_DELAY_MS } from './search-field';
 import { TEST_CLIENT_LIST } from '../../../../test/clients';
+import { TEST_MEMBERS } from '../../../../test/deals';
 import { recordRequests } from '../../../../test/msw/record';
 import { renderWithUrl } from '../../../../test/render';
 import { useClientFilters } from '../model/use-client-filters';
+
+const MAX = {
+  id: '0199a3c4-6a7b-7c8d-9e0f-1a2b3c4d5e6f',
+  name: 'Max Kim',
+  email: 'max@example.com',
+  role: 'manager',
+  joinedAt: '2026-10-02T09:00:00.000Z',
+} as const;
 
 function FilteredList(): React.JSX.Element {
   const state = useClientFilters();
@@ -48,30 +57,47 @@ describe('ClientFiltersToolbar', () => {
   it('should fill the controls from the URL when the page opens with filters', () => {
     renderWithUrl(
       <FilteredList />,
-      '?q=acme&source=website,telegram&tags=vip&mine=true&sort=name_asc',
+      '?q=acme&source=website,telegram&tags=vip&createdBy=me&sort=name_asc',
     );
 
     expect(searchInput()).toHaveValue('acme');
     expect(screen.getByRole('button', { name: /^Source/ })).toHaveTextContent('2');
     expect(screen.getByRole('button', { name: /^Tags/ })).toHaveTextContent('1');
-    expect(screen.getByRole('button', { name: 'Only mine' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: 'Added by: Me' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sort: Name A–Z' })).toBeInTheDocument();
   });
 
-  it('should fill the Only mine button when the filter turns on', async () => {
+  it('should write createdBy and send it with the list when a member is chosen', async () => {
+    recordRequests('get', '/api/members', () =>
+      HttpResponse.json({ items: [...TEST_MEMBERS.items, MAX] }),
+    );
     const user = setup();
-    renderWithUrl(<FilteredList />);
-    const onlyMine = screen.getByRole('button', { name: 'Only mine' });
-    expect(onlyMine).toHaveAttribute('data-variant', 'outline');
+    const { urlUpdates } = renderWithUrl(<FilteredList />);
 
-    await user.click(onlyMine);
+    await user.click(screen.getByRole('button', { name: 'Added by: Anyone' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: MAX.name }));
 
-    expect(onlyMine).toHaveAttribute('aria-pressed', 'true');
-    expect(onlyMine).toHaveAttribute('data-variant', 'secondary');
+    await waitFor(() => {
+      expect(urlUpdates.at(-1)?.queryString).toBe(`?createdBy=${MAX.id}`);
+    });
+    await waitFor(() => {
+      expect(new URL(listRequests.at(-1)?.url ?? '').searchParams.get('createdBy')).toBe(MAX.id);
+    });
+    expect(screen.getByRole('button', { name: `Added by: ${MAX.name}` })).toHaveFocus();
   });
+
+  it.each(['?createdBy=abc', '?mine=true'])(
+    'should filter nothing when the URL has %s',
+    async (search) => {
+      renderWithUrl(<FilteredList />, search);
+
+      expect(screen.getByRole('button', { name: 'Added by: Anyone' })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(listRequests).toHaveLength(1);
+      });
+      expect(new URL(listRequests[0]?.url ?? '').searchParams.has('createdBy')).toBe(false);
+    },
+  );
 
   it('should write q once after the pause and send one list request when the user types', async () => {
     const user = setup();
@@ -138,7 +164,7 @@ describe('ClientFiltersToolbar', () => {
 
   it('should keep the sort and replace history when the filters are cleared', async () => {
     const user = setup();
-    const { urlUpdates } = renderWithUrl(<FilteredList />, '?q=a&mine=true&sort=oldest');
+    const { urlUpdates } = renderWithUrl(<FilteredList />, '?q=a&createdBy=me&sort=oldest');
 
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
 
@@ -165,7 +191,8 @@ describe('ClientFiltersToolbar', () => {
     const { urlUpdates } = renderWithUrl(<FilteredList />);
 
     await user.type(searchInput(), 'rom{Enter}');
-    await user.click(screen.getByRole('button', { name: 'Only mine' }));
+    await user.click(screen.getByRole('button', { name: 'Added by: Anyone' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Me' }));
     await user.click(screen.getByRole('button', { name: /^Source/ }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Website' }));
     await user.keyboard('{Escape}');
@@ -173,7 +200,9 @@ describe('ClientFiltersToolbar', () => {
     await user.click(await screen.findByRole('menuitemradio', { name: 'Name A–Z' }));
 
     await waitFor(() => {
-      expect(urlUpdates.at(-1)?.queryString).toBe('?q=rom&mine=true&source=website&sort=name_asc');
+      expect(urlUpdates.at(-1)?.queryString).toBe(
+        '?q=rom&createdBy=me&source=website&sort=name_asc',
+      );
     });
     expect(urlUpdates.every(({ options }) => options.history === 'replace')).toBe(true);
     expect(urlUpdates.every(({ options }) => options.shallow)).toBe(true);

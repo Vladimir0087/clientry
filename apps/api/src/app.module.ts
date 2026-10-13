@@ -13,7 +13,7 @@ import { AppLoggerModule } from './infra/logger/app-logger.module.js';
 import { QueueModule } from './infra/queue/queue.module.js';
 import { AccessTokenGuard } from './modules/auth/access-token.guard.js';
 import { AuthModule } from './modules/auth/auth.module.js';
-import { RolesGuard } from './modules/auth/roles.guard.js';
+import { PermissionsGuard } from './modules/auth/permissions.guard.js';
 import { ClientsModule } from './modules/clients/clients.module.js';
 import { DealsModule } from './modules/deals/deals.module.js';
 import { HealthModule } from './modules/health/health.module.js';
@@ -46,10 +46,10 @@ export class AppModule {
         WorkspacesModule,
       ],
       providers: [
-        // Global guards run in this order: CSRF check, authentication, role.
+        // Global guards run in this order: CSRF check, authentication, permission.
         { provide: APP_GUARD, useClass: TrustedOriginGuard },
         { provide: APP_GUARD, useExisting: AccessTokenGuard },
-        { provide: APP_GUARD, useExisting: RolesGuard },
+        { provide: APP_GUARD, useExisting: PermissionsGuard },
         { provide: APP_PIPE, useFactory: createValidationPipe },
         { provide: APP_INTERCEPTOR, useClass: StrictSchemaSerializerInterceptor },
         { provide: APP_FILTER, useClass: ProblemDetailsFilter },

@@ -1,14 +1,25 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient, UseMutationResult } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-import { completeTask, reopenTask, taskKeys, updateCachedTask } from '@/entities/task';
-import { isNotFound } from '@/shared/api/api-status';
+import {
+  completeTask,
+  editTaskPath,
+  reopenTask,
+  taskKeys,
+  updateCachedTask,
+} from '@/entities/task';
+import { fieldErrorMessage, isNotFound } from '@/shared/api/api-status';
 import { hasQueryData } from '@/shared/api/has-query-data';
 import type { Task } from '@clientry/shared/tasks';
 
 // One toast however many queued toggles fail together.
 const TOGGLE_ERROR_TOAST = 'toggle-task-error';
+// Long enough to reach "Edit task" by keyboard, as the Undo toasts.
+const EDIT_ACTION_DURATION_MS = 10_000;
+// Sonner merges a toast into the one with its id, so a plain one clears an earlier "Edit task".
+const WITHOUT_EDIT = { action: undefined, duration: undefined };
 
 export interface ToggleTaskVariables {
   readonly isDone: boolean;
@@ -69,9 +80,33 @@ function confirmToggle(queryClient: QueryClient, id: string, task: Task): void {
   void queryClient.invalidateQueries({ queryKey: taskKeys.lists, refetchType: 'none' });
 }
 
-function revertToggle(queryClient: QueryClient, id: string, error: Error): void {
+// A 400 on assigneeId: a done task was reopened after its assignee was removed from the workspace.
+function showToggleError(error: Error, onEdit: () => void): void {
+  if (fieldErrorMessage(error, 'assigneeId') === undefined) {
+    toast.error('Could not update the task. Try again.', {
+      id: TOGGLE_ERROR_TOAST,
+      ...WITHOUT_EDIT,
+    });
+    return;
+  }
+  toast.error(
+    'The assignee is no longer in the workspace. Choose another one to reopen this task.',
+    {
+      id: TOGGLE_ERROR_TOAST,
+      action: { label: 'Edit task', onClick: onEdit },
+      duration: EDIT_ACTION_DURATION_MS,
+    },
+  );
+}
+
+function revertToggle(
+  queryClient: QueryClient,
+  id: string,
+  error: Error,
+  onEdit: () => void,
+): void {
   if (isNotFound(error)) {
-    toast.error('This task no longer exists.', { id: TOGGLE_ERROR_TOAST });
+    toast.error('This task no longer exists.', { id: TOGGLE_ERROR_TOAST, ...WITHOUT_EDIT });
     void queryClient.invalidateQueries({ queryKey: taskKeys.lists });
     void queryClient.invalidateQueries({ queryKey: taskKeys.detail(id) });
     return;
@@ -82,7 +117,7 @@ function revertToggle(queryClient: QueryClient, id: string, error: Error): void 
   // The rollback reads as fresh, yet the request may have reached the server.
   void queryClient.invalidateQueries({ queryKey: taskKeys.lists, refetchType: 'none' });
   void queryClient.invalidateQueries({ queryKey: taskKeys.detail(id), refetchType: 'none' });
-  toast.error('Could not update the task. Try again.', { id: TOGGLE_ERROR_TOAST });
+  showToggleError(error, onEdit);
 }
 
 function settleToggle(queryClient: QueryClient, id: string): void {
@@ -97,6 +132,10 @@ export function useToggleTask(
   id: string,
 ): UseMutationResult<Task, Error, ToggleTaskVariables, undefined> {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const handleEdit = (): void => {
+    router.push(editTaskPath(id));
+  };
   return useMutation({
     mutationKey: toggleKey(id),
     scope: { id: `toggle-task-${id}` },
@@ -106,7 +145,7 @@ export function useToggleTask(
       confirmToggle(queryClient, id, task);
     },
     onError: (error) => {
-      revertToggle(queryClient, id, error);
+      revertToggle(queryClient, id, error, handleEdit);
     },
     onSettled: () => {
       settleToggle(queryClient, id);

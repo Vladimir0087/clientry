@@ -40,7 +40,7 @@ function reminderErrors(remindAt: string | null | undefined): FieldError[] {
 function toFilter(user: AuthUser, query: TaskListQuery): TaskListFilter {
   return {
     status: query.status,
-    assigneeId: query.assignee === 'me' ? user.id : undefined,
+    assigneeId: query.assignee === 'me' ? user.id : query.assignee,
     clientId: query.clientId,
     dealId: query.dealId,
   };
@@ -177,6 +177,10 @@ export class TasksService {
       }
       if ((current.doneAt !== null) === isDone) {
         return { task: current, isChanged: false };
+      }
+      // A reopened task is open work again, so it must not land on a removed member.
+      if (!isDone) {
+        await this.checkFields(tasks, workspaceId, { assigneeId: current.assignee.id });
       }
       const doneAt = isDone ? new Date().toISOString() : null;
       return { task: await this.write(tasks, workspaceId, id, { doneAt }), isChanged: true };

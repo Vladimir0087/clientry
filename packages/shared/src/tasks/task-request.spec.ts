@@ -167,7 +167,11 @@ describe('taskListQuerySchema', () => {
     expect(messagesOf(result)).toEqual(['Use clientId or dealId, not both']);
   });
 
-  it('should reject the assignee when it is not me', () => {
+  it.each(['me', MEMBER_ID])('should accept the assignee when it is %s', (assignee) => {
+    expect(taskListQuerySchema.parse({ assignee }).assignee).toBe(assignee);
+  });
+
+  it('should reject the assignee when it is neither me nor an id', () => {
     expect(failedPaths(taskListQuerySchema.safeParse({ assignee: 'someone' }))).toEqual([
       'assignee',
     ]);

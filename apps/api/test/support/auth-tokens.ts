@@ -17,7 +17,7 @@ export interface AccessTokenInput {
 }
 
 // Computed here rather than with the API's helper, so tests check the stored hash independently.
-export function refreshTokenHash(token: string): Uint8Array<ArrayBuffer> {
+export function opaqueTokenHash(token: string): Uint8Array<ArrayBuffer> {
   return createHash('sha256').update(token).digest();
 }
 

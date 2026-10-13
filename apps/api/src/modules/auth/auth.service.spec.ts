@@ -11,13 +11,16 @@ import {
   AuthService,
 } from './auth.service.js';
 import {
+  AlreadyInWorkspaceError,
   EmailTakenError,
   InvalidCredentialsError,
   InvalidRefreshTokenError,
+  InviteInvalidError,
   NoWorkspaceError,
 } from './errors.js';
 import type { PasswordHasher } from './password-hasher.js';
 import type { SessionsRepository, StoredRefreshToken } from './sessions.repository.js';
+import { opaqueTokenHash } from '../../../test/support/auth-tokens.js';
 
 const NOW = new Date('2026-10-04T12:00:00.000Z');
 const PASSWORD = 'correct horse battery';
@@ -26,6 +29,27 @@ const ACCOUNT: Account = {
   user: { id: '0199a3c4-5e6f-7a8b-9c0d-1e2f3a4b5c6d', email: 'ann@studio.dev', name: 'Ann' },
   workspace: { id: '0199a3c4-5e70-7b1c-8d2e-3f4a5b6c7d8e', name: 'Pixel Studio' },
   role: 'owner',
+};
+
+const MANAGER_ACCOUNT: Account = { ...ACCOUNT, role: 'manager' };
+
+const INVITE_ID = '0199b0d2-1a2b-7c3d-8e4f-5a6b7c8d9e0f';
+const INVITE_TOKEN = 'q3V8Hn1xKZ0bWcR5tYp2LmA9sEoJfDgU7iNvXwC4hBk';
+const PREVIOUS_REFRESH_TOKEN = 'previous-refresh-token';
+
+const INVITE_REGISTRATION = {
+  token: INVITE_TOKEN,
+  email: 'max@studio.dev',
+  password: PASSWORD,
+  name: 'Max',
+};
+
+const INVITE_LOGIN = { token: INVITE_TOKEN, email: 'max@studio.dev', password: PASSWORD };
+
+const INVITE_PREVIEW = {
+  workspace: { name: 'Pixel Studio' },
+  invitedBy: { name: 'Ann' },
+  expiresAt: '2026-10-16T09:30:00.000Z',
 };
 
 const REGISTRATION = {
@@ -65,6 +89,13 @@ function createAccountsMock() {
         account: ACCOUNT,
       }),
     findAccount: vi.fn<AccountsRepository['findAccount']>().mockResolvedValue(ACCOUNT),
+    findInvitePreview: vi.fn<AccountsRepository['findInvitePreview']>().mockResolvedValue(null),
+    createInvitedAccount: vi
+      .fn<AccountsRepository['createInvitedAccount']>()
+      .mockResolvedValue({ account: MANAGER_ACCOUNT, inviteId: INVITE_ID }),
+    joinByInvite: vi
+      .fn<AccountsRepository['joinByInvite']>()
+      .mockResolvedValue({ account: MANAGER_ACCOUNT, inviteId: INVITE_ID }),
   } satisfies AccountsRepository;
 }
 
@@ -177,6 +208,14 @@ describe('AuthService', () => {
       ).rejects.toThrow(NoWorkspaceError);
     });
 
+    it('should throw NoWorkspaceError when the member is removed before the session starts', async () => {
+      sessions.createSession.mockResolvedValue(null);
+
+      await expect(
+        service.login({ email: ACCOUNT.user.email, password: PASSWORD }),
+      ).rejects.toThrow(NoWorkspaceError);
+    });
+
     it('should create a session ending in 30 days when the credentials are valid', async () => {
       await service.login({ email: ACCOUNT.user.email, password: PASSWORD });
 
@@ -201,6 +240,153 @@ describe('AuthService', () => {
         { id: ACCOUNT.user.id, workspaceId: ACCOUNT.workspace.id, role: 'owner' },
         'session-new',
       );
+    });
+  });
+
+  describe('registerByInvite', () => {
+    it('should hash the password before the repository call when joining', async () => {
+      await service.registerByInvite(INVITE_REGISTRATION, undefined);
+
+      expect(accounts.createInvitedAccount).toHaveBeenCalledWith(
+        expect.objectContaining({ passwordHash: 'new-hash', email: 'max@studio.dev', now: NOW }),
+      );
+      expect(hasher.hash.mock.invocationCallOrder[0]).toBeLessThan(
+        accounts.createInvitedAccount.mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
+    it('should look the invite up by the hash of the token when joining', async () => {
+      await service.registerByInvite(INVITE_REGISTRATION, undefined);
+
+      const [input] = accounts.createInvitedAccount.mock.calls[0] ?? [];
+      expect(
+        Buffer.from(input?.tokenHash ?? []).equals(Buffer.from(opaqueTokenHash(INVITE_TOKEN))),
+      ).toBe(true);
+    });
+
+    it.each([new InviteInvalidError(), new EmailTakenError()])(
+      'should propagate %s and keep the previous session when the join fails',
+      async (error) => {
+        accounts.createInvitedAccount.mockRejectedValue(error);
+
+        await expect(
+          service.registerByInvite(INVITE_REGISTRATION, PREVIOUS_REFRESH_TOKEN),
+        ).rejects.toThrow(error);
+        expect(sessions.revokeSession).not.toHaveBeenCalled();
+        expect(sessions.createSession).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should revoke the session of the presented refresh token when the join succeeds', async () => {
+      await service.registerByInvite(INVITE_REGISTRATION, PREVIOUS_REFRESH_TOKEN);
+
+      const [presentedHash] = sessions.findToken.mock.calls[0] ?? [];
+      expect(
+        Buffer.from(presentedHash ?? []).equals(
+          Buffer.from(opaqueTokenHash(PREVIOUS_REFRESH_TOKEN)),
+        ),
+      ).toBe(true);
+      expect(sessions.revokeSession).toHaveBeenCalledWith('session-1', NOW);
+      expect(sessions.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: MANAGER_ACCOUNT.user.id }),
+      );
+    });
+
+    it('should throw NoWorkspaceError and keep the presented session when the session is refused', async () => {
+      sessions.createSession.mockResolvedValue(null);
+
+      await expect(
+        service.registerByInvite(INVITE_REGISTRATION, PREVIOUS_REFRESH_TOKEN),
+      ).rejects.toThrow(NoWorkspaceError);
+      expect(sessions.revokeSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('loginByInvite', () => {
+    const NO_MEMBERSHIP = { userId: ACCOUNT.user.id, passwordHash: 'stored-hash', account: null };
+
+    beforeEach(() => {
+      accounts.findInvitePreview.mockResolvedValue(INVITE_PREVIEW);
+      accounts.findCredentialsByEmail.mockResolvedValue(NO_MEMBERSHIP);
+    });
+
+    it('should throw InviteInvalidError without reading the credentials when the invite is not pending', async () => {
+      accounts.findInvitePreview.mockResolvedValue(null);
+
+      await expect(service.loginByInvite(INVITE_LOGIN, undefined)).rejects.toThrow(
+        InviteInvalidError,
+      );
+      expect(accounts.findCredentialsByEmail).not.toHaveBeenCalled();
+      expect(hasher.verify).not.toHaveBeenCalled();
+      expect(hasher.verifyDummy).not.toHaveBeenCalled();
+    });
+
+    it('should check the dummy hash and throw InvalidCredentialsError when the email is unknown', async () => {
+      accounts.findCredentialsByEmail.mockResolvedValue(null);
+
+      await expect(service.loginByInvite(INVITE_LOGIN, undefined)).rejects.toThrow(
+        InvalidCredentialsError,
+      );
+      expect(hasher.verifyDummy).toHaveBeenCalledWith(PASSWORD);
+      expect(accounts.joinByInvite).not.toHaveBeenCalled();
+    });
+
+    it('should throw AlreadyInWorkspaceError without a claim when the account has a membership', async () => {
+      accounts.findCredentialsByEmail.mockResolvedValue({ ...NO_MEMBERSHIP, account: ACCOUNT });
+
+      await expect(service.loginByInvite(INVITE_LOGIN, undefined)).rejects.toThrow(
+        AlreadyInWorkspaceError,
+      );
+      expect(accounts.joinByInvite).not.toHaveBeenCalled();
+    });
+
+    it('should delete ended sessions, start one and revoke the presented one when the join succeeds', async () => {
+      await service.loginByInvite(INVITE_LOGIN, PREVIOUS_REFRESH_TOKEN);
+
+      expect(accounts.joinByInvite).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: ACCOUNT.user.id, now: NOW }),
+      );
+      expect(sessions.deleteEndedSessions).toHaveBeenCalledWith(ACCOUNT.user.id, NOW);
+      expect(sessions.revokeSession).toHaveBeenCalledWith('session-1', NOW);
+      expect(sessions.createSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('should delete ended sessions before the claim when the join succeeds', async () => {
+      await service.loginByInvite(INVITE_LOGIN, PREVIOUS_REFRESH_TOKEN);
+
+      expect(
+        sessions.deleteEndedSessions.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+      ).toBeLessThan(accounts.joinByInvite.mock.invocationCallOrder[0] ?? 0);
+    });
+
+    it('should keep the presented session when the invite is invalid', async () => {
+      accounts.joinByInvite.mockRejectedValue(new InviteInvalidError());
+
+      await expect(service.loginByInvite(INVITE_LOGIN, PREVIOUS_REFRESH_TOKEN)).rejects.toThrow(
+        InviteInvalidError,
+      );
+      expect(sessions.revokeSession).not.toHaveBeenCalled();
+    });
+
+    it('should throw NoWorkspaceError and keep the presented session when the session is refused', async () => {
+      sessions.createSession.mockResolvedValue(null);
+
+      await expect(service.loginByInvite(INVITE_LOGIN, PREVIOUS_REFRESH_TOKEN)).rejects.toThrow(
+        NoWorkspaceError,
+      );
+      expect(sessions.revokeSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('previewInvite', () => {
+    it('should throw InviteInvalidError when no pending invite matches', async () => {
+      await expect(service.previewInvite(INVITE_TOKEN)).rejects.toThrow(InviteInvalidError);
+    });
+
+    it('should return the preview when a pending invite matches', async () => {
+      accounts.findInvitePreview.mockResolvedValue(INVITE_PREVIEW);
+
+      await expect(service.previewInvite(INVITE_TOKEN)).resolves.toEqual(INVITE_PREVIEW);
     });
   });
 

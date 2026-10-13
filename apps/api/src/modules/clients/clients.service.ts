@@ -61,7 +61,7 @@ function toFilter(user: AuthUser, query: ClientListQuery): ClientListFilter {
     search: query.q === '' ? undefined : query.q,
     sources: toList(query.source),
     tags: toList(query.tag),
-    createdById: query.createdBy === 'me' ? user.id : undefined,
+    createdById: query.createdBy === 'me' ? user.id : query.createdBy,
   };
 }
 

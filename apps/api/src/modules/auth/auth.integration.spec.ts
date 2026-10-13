@@ -18,7 +18,7 @@ import {
   uniqueEmail,
 } from '../../../test/fixtures/accounts.js';
 import { resetDatabase } from '../../../test/reset-database.js';
-import { refreshTokenHash, signAccessToken } from '../../../test/support/auth-tokens.js';
+import { opaqueTokenHash, signAccessToken } from '../../../test/support/auth-tokens.js';
 import { setCookies, setCookieValue } from '../../../test/support/set-cookies.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
 
@@ -126,7 +126,7 @@ describe('auth API', () => {
 
       expect(user.passwordHash).toMatch(/^\$argon2id\$/);
       expect(storedHash.toString('base64url')).not.toBe(refreshToken);
-      expect(storedHash.equals(refreshTokenHash(refreshToken))).toBe(true);
+      expect(storedHash.equals(opaqueTokenHash(refreshToken))).toBe(true);
     });
 
     it('should answer 409 EMAIL_TAKEN when the email differs only in case and spaces', async () => {
@@ -312,6 +312,9 @@ describe('auth API', () => {
       ['POST', '/api/auth/refresh'],
       ['POST', '/api/auth/logout'],
       ['GET', '/api/auth/me'],
+      ['POST', '/api/auth/invite/preview'],
+      ['POST', '/api/auth/invite/register'],
+      ['POST', '/api/auth/invite/login'],
     ])('should send Cache-Control no-store when %s %s answers', async (method, path) => {
       const response = await (method === 'GET' ? send().get(path) : send().post(path).send({}));
 

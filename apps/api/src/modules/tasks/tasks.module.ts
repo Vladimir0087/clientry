@@ -9,6 +9,7 @@ import { ReminderQueue } from './reminder-queue.js';
 import { RemindersRepository } from './reminders.repository.js';
 import { RemindersService } from './reminders.service.js';
 import { RemindersWorker } from './reminders.worker.js';
+import { TaskHandover } from './task-handover.repository.js';
 import { TasksController } from './tasks.controller.js';
 import { TasksRepository } from './tasks.repository.js';
 import { TasksService } from './tasks.service.js';
@@ -22,6 +23,7 @@ import { QueueFactory } from '../../infra/queue/queue-factory.js';
     TasksService,
     RemindersService,
     RemindersWorker,
+    TaskHandover,
     { provide: TasksRepository, useClass: PrismaTasksRepository },
     { provide: RemindersRepository, useClass: PrismaRemindersRepository },
     { provide: ReminderQueue, useClass: BullmqReminderQueue },
@@ -31,5 +33,6 @@ import { QueueFactory } from '../../infra/queue/queue-factory.js';
       inject: [QueueFactory],
     },
   ],
+  exports: [TaskHandover],
 })
 export class TasksModule {}

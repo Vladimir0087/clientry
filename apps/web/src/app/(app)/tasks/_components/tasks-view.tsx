@@ -15,15 +15,25 @@ import { PageHeading } from '@/shared/ui/page-heading';
 import { RetryMessage } from '@/shared/ui/retry-message';
 
 import { TaskRows } from '../../_components/task-rows';
+import { useFilterSubject } from '../../_lib/use-filter-subject';
+import type { FilterSubject } from '../../_lib/use-filter-subject';
 
 const HEADING_ID = 'tasks-heading';
 
 interface EmptyStateProps {
   readonly filters: TaskFilters;
+  readonly subject: FilterSubject;
   readonly onShowEveryone: () => void;
 }
 
-function EmptyState({ filters, onShowEveryone }: EmptyStateProps): React.JSX.Element {
+function emptyTitle(subject: Exclude<FilterSubject, { kind: 'anyone' }>): string {
+  if (subject.kind === 'me') {
+    return 'No open tasks are assigned to you.';
+  }
+  return `No open tasks are assigned to ${subject.name ?? 'this member'}.`;
+}
+
+function EmptyState({ filters, subject, onShowEveryone }: EmptyStateProps): React.JSX.Element {
   if (filters.status === 'done') {
     return (
       <Empty className="border">
@@ -33,7 +43,7 @@ function EmptyState({ filters, onShowEveryone }: EmptyStateProps): React.JSX.Ele
       </Empty>
     );
   }
-  if (!filters.isMine) {
+  if (subject.kind === 'anyone') {
     return (
       <Empty className="border">
         <EmptyHeader>
@@ -45,7 +55,7 @@ function EmptyState({ filters, onShowEveryone }: EmptyStateProps): React.JSX.Ele
   return (
     <Empty className="border">
       <EmptyHeader>
-        <EmptyTitle>No open tasks are assigned to you.</EmptyTitle>
+        <EmptyTitle>{emptyTitle(subject)}</EmptyTitle>
       </EmptyHeader>
       <EmptyContent>
         <Button variant="outline" onClick={onShowEveryone}>
@@ -60,7 +70,7 @@ interface ListBodyProps extends EmptyStateProps {
   readonly list: UseInfiniteQueryResult<TaskListData>;
 }
 
-function ListBody({ list, filters, onShowEveryone }: ListBodyProps): React.JSX.Element {
+function ListBody({ list, filters, subject, onShowEveryone }: ListBodyProps): React.JSX.Element {
   if (list.data === undefined) {
     if (!list.isError) {
       return <TaskListSkeleton />;
@@ -78,24 +88,32 @@ function ListBody({ list, filters, onShowEveryone }: ListBodyProps): React.JSX.E
   }
   const hasItems = list.data.pages.some((page) => page.items.length > 0);
   if (hasItems) {
-    return <TaskRows list={list} data={list.data} place="list" isAssigneeShown={!filters.isMine} />;
+    return (
+      <TaskRows
+        list={list}
+        data={list.data}
+        place="list"
+        isAssigneeShown={filters.assignee === null}
+      />
+    );
   }
   // An empty list of the old filters says nothing about the new ones.
   return list.isPlaceholderData ? (
     <TaskListSkeleton />
   ) : (
-    <EmptyState filters={filters} onShowEveryone={onShowEveryone} />
+    <EmptyState filters={filters} subject={subject} onShowEveryone={onShowEveryone} />
   );
 }
 
 export function TasksView(): React.JSX.Element {
   const state = useTaskFilters();
   const list = useTasks(state.filters);
-  const mineRef = useRef<HTMLButtonElement>(null);
-  // The button goes with the empty state, so "Only mine", now off, takes its focus.
+  const subject = useFilterSubject(state.filters.assignee);
+  const assigneeRef = useRef<HTMLButtonElement>(null);
+  // The button goes with the empty state, so the menu, now on anyone, takes its focus.
   const handleShowEveryone = (): void => {
-    state.setMine(false);
-    mineRef.current?.focus();
+    state.setAssignee(null);
+    assigneeRef.current?.focus();
   };
   return (
     <div className="flex flex-col gap-6">
@@ -108,8 +126,13 @@ export function TasksView(): React.JSX.Element {
           </Link>
         </Button>
       </div>
-      <TaskFiltersToolbar state={state} mineRef={mineRef} />
-      <ListBody list={list} filters={state.filters} onShowEveryone={handleShowEveryone} />
+      <TaskFiltersToolbar state={state} assigneeRef={assigneeRef} />
+      <ListBody
+        list={list}
+        filters={state.filters}
+        subject={subject}
+        onShowEveryone={handleShowEveryone}
+      />
     </div>
   );
 }

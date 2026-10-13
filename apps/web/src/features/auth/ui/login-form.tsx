@@ -36,7 +36,9 @@ function applyLoginError(
     return { message: 'Email or password is incorrect.' };
   }
   if (error instanceof ApiError && error.code === NO_WORKSPACE) {
-    return { message: 'This account is not a member of any workspace.' };
+    return {
+      message: 'This account is not a member of any workspace. Ask an owner for an invite link.',
+    };
   }
   return applySubmitError(error, form, LOGIN_FIELDS);
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import { CheckIcon } from 'lucide-react';
 import type * as React from 'react';
 
+import { MemberFilterMenu } from '@/entities/member';
+import { useSession } from '@/entities/session';
 import { Button } from '@/shared/ui/button';
 import type { TaskStatus } from '@clientry/shared/tasks';
 
@@ -15,25 +16,24 @@ const STATUSES: readonly { readonly value: TaskStatus; readonly label: string }[
 
 interface TaskFiltersToolbarProps {
   readonly state: TaskFiltersState;
-  readonly mineRef?: React.Ref<HTMLButtonElement>;
+  readonly assigneeRef?: React.Ref<HTMLButtonElement>;
 }
 
-export function TaskFiltersToolbar({ state, mineRef }: TaskFiltersToolbarProps): React.JSX.Element {
-  const { isMine, status } = state.filters;
-  const handleMineClick = (): void => {
-    state.setMine(!isMine);
-  };
+export function TaskFiltersToolbar({
+  state,
+  assigneeRef,
+}: TaskFiltersToolbarProps): React.JSX.Element {
+  const { assignee, status } = state.filters;
+  const session = useSession();
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
-        ref={mineRef}
-        variant={isMine ? 'secondary' : 'outline'}
-        aria-pressed={isMine}
-        onClick={handleMineClick}
-      >
-        {isMine && <CheckIcon aria-hidden="true" />}
-        Only mine
-      </Button>
+      <MemberFilterMenu
+        ref={assigneeRef}
+        label="Assignee"
+        value={assignee}
+        currentUserId={session.data?.user.id}
+        onChange={state.setAssignee}
+      />
       <div role="group" aria-label="Status" className="flex">
         {STATUSES.map(({ value, label }) => {
           const isPressed = status === value;

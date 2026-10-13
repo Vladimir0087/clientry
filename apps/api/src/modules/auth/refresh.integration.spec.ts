@@ -14,7 +14,7 @@ import { createTestApp } from '../../../test/create-test-app.js';
 import type { TestApp } from '../../../test/create-test-app.js';
 import { registerAccount } from '../../../test/fixtures/accounts.js';
 import { resetDatabase } from '../../../test/reset-database.js';
-import { refreshTokenHash } from '../../../test/support/auth-tokens.js';
+import { opaqueTokenHash } from '../../../test/support/auth-tokens.js';
 import { setCookies, setCookieValue } from '../../../test/support/set-cookies.js';
 import { TestOnlyModule } from '../../../test/support/test-only.module.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
@@ -84,7 +84,7 @@ describe('refresh API', () => {
     const { refreshToken } = await registerAccount(testApp);
     const newest = setCookieValue(await refresh(refreshToken).expect(200), REFRESH_TOKEN_COOKIE);
     await prisma.refreshToken.update({
-      where: { tokenHash: refreshTokenHash(refreshToken) },
+      where: { tokenHash: opaqueTokenHash(refreshToken) },
       data: { rotatedAt: new Date(Date.now() - 31_000) },
     });
 
@@ -108,7 +108,7 @@ describe('refresh API', () => {
   it('should answer 401 when the token has been idle for 14 days', async () => {
     const { refreshToken } = await registerAccount(testApp);
     await prisma.refreshToken.update({
-      where: { tokenHash: refreshTokenHash(refreshToken) },
+      where: { tokenHash: opaqueTokenHash(refreshToken) },
       data: { createdAt: new Date(Date.now() - 14 * DAY_MS) },
     });
 

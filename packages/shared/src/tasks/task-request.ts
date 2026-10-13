@@ -4,6 +4,7 @@ import { instantSchema } from './instant.js';
 import { TASK_LIMITS } from './limits.js';
 import { idSchema } from '../common/id.js';
 import { textSchema } from '../common/text.js';
+import { memberFilterSchema } from '../workspaces/member-filter.js';
 
 const titleSchema = textSchema
   .trim()
@@ -47,7 +48,7 @@ export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export const taskListQuerySchema = z
   .object({
     status: taskStatusSchema.default('open'),
-    assignee: z.literal('me').optional(),
+    assignee: memberFilterSchema.optional(),
     clientId: idSchema().optional(),
     dealId: idSchema().optional(),
     cursor: z.string().max(TASK_LIMITS.cursor).optional(),

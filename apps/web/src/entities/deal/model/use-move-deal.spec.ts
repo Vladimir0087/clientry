@@ -21,6 +21,15 @@ describe('moveErrorMessage', () => {
       new ApiError({ status: 404, code: 'DEAL_NOT_FOUND' }),
       'This deal no longer exists.',
     ],
+    [
+      'the assignee of a reopened deal is no longer a member',
+      new ApiError({
+        status: 400,
+        code: 'VALIDATION_FAILED',
+        errors: [{ path: 'assigneeId', message: 'Choose a member' }],
+      }),
+      'The assignee is no longer in the workspace. Choose another one to reopen this deal.',
+    ],
     ['the request fails otherwise', new Error('offline'), 'Could not move the deal. Try again.'],
   ])('should explain the failure on the board when %s', (_case, error, message) => {
     expect(moveErrorMessage(error, 'board')).toBe(message);

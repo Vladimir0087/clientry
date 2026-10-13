@@ -1,3 +1,5 @@
+export const DATE_FORMAT = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
+
 export const DATE_TIME_FORMAT = new Intl.DateTimeFormat('en-US', {
   dateStyle: 'medium',
   timeStyle: 'short',
@@ -45,4 +47,9 @@ export function toTimeInput(instant: string): string {
 // For text that cannot hold a <LocalDate>, such as a field hint; call it in the browser only.
 export function formatDateTime(instant: string): string {
   return DATE_TIME_FORMAT.format(new Date(instant));
+}
+
+// The date alone, for text such as an accessible name; call it in the browser only.
+export function formatDate(instant: string): string {
+  return DATE_FORMAT.format(new Date(instant));
 }

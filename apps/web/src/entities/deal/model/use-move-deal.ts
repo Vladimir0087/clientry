@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient, QueryKey, UseMutationResult } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { hasErrorCode, isNotFound } from '@/shared/api/api-status';
+import { fieldErrorMessage, hasErrorCode, isNotFound } from '@/shared/api/api-status';
 import type { Board, Deal } from '@clientry/shared/deals';
 
 import { applyMove, cardVersion, revertMove, withServerDeal } from './apply-move';
@@ -15,6 +15,8 @@ const MOVE_KEY = ['deals', 'move'];
 const MOVE_SCOPE = { id: 'move-deal' };
 // One toast however many queued moves fail together.
 const MOVE_ERROR_TOAST = 'move-deal-error';
+// Long enough to reach "Edit deal" by keyboard, as the Undo toasts.
+const EDIT_ACTION_DURATION_MS = 10_000;
 
 type MoveSurface = 'board' | 'page';
 
@@ -27,9 +29,27 @@ interface MoveContext {
   readonly snapshot: readonly (readonly [QueryKey, Board | undefined])[];
 }
 
+// A closed deal moved back to an open stage, while its assignee was removed from the workspace.
+function isAssigneeGone(error: unknown): boolean {
+  return fieldErrorMessage(error, 'assigneeId') !== undefined;
+}
+
+// Sonner merges a toast into the one with its id, so both are set even when empty.
+function showMoveError(error: unknown, surface: MoveSurface, onEdit: () => void): void {
+  const isGone = isAssigneeGone(error);
+  toast.error(moveErrorMessage(error, surface), {
+    id: MOVE_ERROR_TOAST,
+    action: isGone ? { label: 'Edit deal', onClick: onEdit } : undefined,
+    duration: isGone ? EDIT_ACTION_DURATION_MS : undefined,
+  });
+}
+
 export function moveErrorMessage(error: unknown, surface: MoveSurface): string {
   if (hasErrorCode(error, 'DEAL_CHANGED')) {
     return CHANGED_MESSAGES[surface];
+  }
+  if (isAssigneeGone(error)) {
+    return 'The assignee is no longer in the workspace. Choose another one to reopen this deal.';
   }
   if (hasErrorCode(error, 'BOARD_CHANGED')) {
     return 'The board changed. Try again.';
@@ -90,8 +110,10 @@ function storeMovedDeal(queryClient: QueryClient, deal: Deal): void {
   void queryClient.invalidateQueries({ queryKey: dealKeys.byClient(deal.client.id) });
 }
 
+// onEditDeal opens the deal's edit form, where a removed assignee is replaced before a reopen.
 export function useMoveDeal(
   surface: MoveSurface,
+  onEditDeal: (dealId: string) => void,
 ): UseMutationResult<Deal, Error, MoveDealVariables, MoveContext> {
   const queryClient = useQueryClient();
   return useMutation({
@@ -123,7 +145,9 @@ export function useMoveDeal(
       // The deal page reads the version from the detail, which the board refetch leaves alone.
       void queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) });
       void queryClient.invalidateQueries({ queryKey: dealKeys.history(dealId) });
-      toast.error(moveErrorMessage(error, surface), { id: MOVE_ERROR_TOAST });
+      showMoveError(error, surface, () => {
+        onEditDeal(dealId);
+      });
     },
     onSuccess: (deal) => {
       storeMovedDeal(queryClient, deal);
