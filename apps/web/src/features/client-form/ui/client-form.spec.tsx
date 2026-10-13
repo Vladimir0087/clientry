@@ -20,7 +20,7 @@ import type { Resolver } from '../../../../test/msw/record';
 import { renderWithProviders } from '../../../../test/render';
 
 const CARD_PATH = `/clients/${TEST_CLIENT.id}`;
-const OPEN_TASKS: TaskFilters = { isMine: true, status: 'open' };
+const OPEN_TASKS: TaskFilters = { assignee: 'me', status: 'open' };
 const NO_TASKS = { pages: [{ items: [], nextCursor: null }], pageParams: [null] };
 
 function answerCreate(resolver: Resolver): Request[] {

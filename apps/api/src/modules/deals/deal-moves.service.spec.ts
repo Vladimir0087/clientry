@@ -18,6 +18,7 @@ import {
   WORKSPACE_ID,
 } from '../../../test/support/deal-doubles.js';
 import type { RepositoryMock, TransactionMock } from '../../../test/support/deal-doubles.js';
+import { RequestValidationError } from '../../common/errors/request-validation.error.js';
 
 const NEIGHBOUR_ID = '0199b1e2-3c4d-7e5f-8a9b-0c1d2e3f4a5c';
 const [LOW = '', HIGH = ''] = positionsAfter(null, 2);
@@ -155,6 +156,36 @@ describe('DealMovesService', () => {
       await service.move(OWNER, DEAL.id, { version: 1, stageId: CALL_STAGE.id, afterId: null });
 
       expect(placement()?.closedAt).toBeNull();
+    });
+
+    it('should throw RequestValidationError on assigneeId and write nothing when a closed deal of a former member is reopened', async () => {
+      tx.findById.mockResolvedValue({
+        ...DEAL,
+        stage: WON_STAGE,
+        closedAt: '2026-10-01T00:00:00.000Z',
+      });
+      tx.findStage.mockResolvedValue(CALL_STAGE);
+      tx.findMember.mockResolvedValue(null);
+
+      const result = service.move(OWNER, DEAL.id, {
+        version: 1,
+        stageId: CALL_STAGE.id,
+        afterId: null,
+      });
+
+      await expect(result).rejects.toBeInstanceOf(RequestValidationError);
+      await expect(result).rejects.toMatchObject({
+        fieldErrors: [{ path: 'assigneeId', message: 'Choose a member' }],
+      });
+      expect(tx.move).not.toHaveBeenCalled();
+    });
+
+    it('should check no membership when an open deal moves to another open stage', async () => {
+      tx.findStage.mockResolvedValue(CALL_STAGE);
+
+      await service.move(OWNER, DEAL.id, { version: 1, stageId: CALL_STAGE.id, afterId: null });
+
+      expect(tx.findMember).not.toHaveBeenCalled();
     });
 
     it('should ignore afterId when the stage is closed', async () => {

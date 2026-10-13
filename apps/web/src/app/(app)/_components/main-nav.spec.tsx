@@ -45,4 +45,13 @@ describe('MainNav', () => {
       expect(screen.getByRole('link', { name: 'Deals' })).not.toHaveAttribute('aria-current');
     },
   );
+
+  it('should mark only Team as the current page when the path is /team', () => {
+    mockPathname.current = '/team';
+
+    render(<MainNav />);
+
+    expect(screen.getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Tasks' })).not.toHaveAttribute('aria-current');
+  });
 });

@@ -3,6 +3,7 @@ import { useQueryStates } from 'nuqs';
 import { hasActiveFilters } from '@/entities/client';
 import type { ClientFilters } from '@/entities/client';
 import type { ClientSort, ClientSource } from '@clientry/shared/clients';
+import type { MemberFilter } from '@clientry/shared/workspaces';
 
 import { clientFilterParsers, toClientFilters } from './client-filter-parsers';
 
@@ -16,7 +17,7 @@ export interface ClientFiltersState {
   readonly setSearch: (q: string) => void;
   readonly setSources: (sources: readonly ClientSource[]) => void;
   readonly setTags: (tags: readonly string[]) => void;
-  readonly setMine: (isMine: boolean) => void;
+  readonly setCreatedBy: (createdBy: MemberFilter | null) => void;
   readonly setSort: (sort: ClientSort) => void;
   readonly clearFilters: () => void;
 }
@@ -36,14 +37,14 @@ export function useClientFilters(): ClientFiltersState {
     setTags: (tags) => {
       void setValues({ tags: [...tags].toSorted() });
     },
-    setMine: (isMine) => {
-      void setValues({ mine: isMine });
+    setCreatedBy: (createdBy) => {
+      void setValues({ createdBy });
     },
     setSort: (sort) => {
       void setValues({ sort });
     },
     clearFilters: () => {
-      void setValues({ q: null, source: null, tags: null, mine: null });
+      void setValues({ q: null, source: null, tags: null, createdBy: null });
     },
   };
 }

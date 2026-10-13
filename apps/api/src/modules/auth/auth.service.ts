@@ -1,22 +1,31 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { LoginRequest, RegisterRequest, SessionResponse } from '@clientry/shared/auth';
+import type {
+  InviteLoginRequest,
+  InvitePreviewResponse,
+  InviteRegisterRequest,
+  LoginRequest,
+  RegisterRequest,
+  SessionResponse,
+} from '@clientry/shared/auth';
 
 import { AccessTokenService } from './access-token.service.js';
 import { AccountsRepository } from './accounts.repository.js';
-import type { Account } from './accounts.repository.js';
+import type { Account, AccountCredentials, JoinedAccount } from './accounts.repository.js';
 import { DEFAULT_STAGES } from './default-stages.js';
 import {
+  AlreadyInWorkspaceError,
   AuthenticationRequiredError,
   InvalidCredentialsError,
+  InviteInvalidError,
   InvalidRefreshTokenError,
   NoWorkspaceError,
 } from './errors.js';
 import { PasswordHasher } from './password-hasher.js';
-import { generateRefreshToken, hashRefreshToken } from './refresh-token.js';
 import { SessionsRepository } from './sessions.repository.js';
 import type { StoredRefreshToken } from './sessions.repository.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
+import { generateOpaqueToken, hashOpaqueToken } from '../../common/crypto/opaque-token.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -82,17 +91,7 @@ export class AuthService {
   }
 
   async login(input: LoginRequest): Promise<IssuedSession> {
-    const credentials = await this.accounts.findCredentialsByEmail(input.email);
-    if (!credentials) {
-      await this.hasher.verifyDummy(input.password);
-      this.logger.log({ reason: 'unknown_email' }, 'Login failed');
-      throw new InvalidCredentialsError();
-    }
-    const isValid = await this.hasher.verify(credentials.passwordHash, input.password);
-    if (!isValid) {
-      this.logger.log({ reason: 'wrong_password', userId: credentials.userId }, 'Login failed');
-      throw new InvalidCredentialsError();
-    }
+    const credentials = await this.verifyCredentials(input);
     if (!credentials.account) {
       throw new NoWorkspaceError();
     }
@@ -100,6 +99,52 @@ export class AuthService {
     await this.sessions.deleteEndedSessions(credentials.userId, now);
     this.logger.log({ userId: credentials.userId }, 'Logged in');
     return this.startSession(credentials.account, now);
+  }
+
+  async previewInvite(token: string): Promise<InvitePreviewResponse> {
+    const preview = await this.accounts.findInvitePreview(hashOpaqueToken(token), new Date());
+    if (!preview) {
+      throw new InviteInvalidError();
+    }
+    return preview;
+  }
+
+  // presentedRefreshToken is the browser's previous session, signed out once the join succeeds.
+  async registerByInvite(
+    input: InviteRegisterRequest,
+    presentedRefreshToken: string | undefined,
+  ): Promise<IssuedSession> {
+    const passwordHash = await this.hasher.hash(input.password);
+    const now = new Date();
+    const joined = await this.accounts.createInvitedAccount({
+      tokenHash: hashOpaqueToken(input.token),
+      email: input.email,
+      passwordHash,
+      name: input.name,
+      now,
+    });
+    return this.enterJoinedWorkspace(joined, 'register', presentedRefreshToken, now);
+  }
+
+  async loginByInvite(
+    input: InviteLoginRequest,
+    presentedRefreshToken: string | undefined,
+  ): Promise<IssuedSession> {
+    // A dead link answers before any password check, so this is no second endpoint for guessing.
+    await this.previewInvite(input.token);
+    const credentials = await this.verifyCredentials(input);
+    if (credentials.account) {
+      throw new AlreadyInWorkspaceError();
+    }
+    const now = new Date();
+    // Before the claim: a failure after it would leave the account joined and the link dead.
+    await this.sessions.deleteEndedSessions(credentials.userId, now);
+    const joined = await this.accounts.joinByInvite({
+      tokenHash: hashOpaqueToken(input.token),
+      userId: credentials.userId,
+      now,
+    });
+    return this.enterJoinedWorkspace(joined, 'login', presentedRefreshToken, now);
   }
 
   async refresh(refreshToken: string | undefined): Promise<IssuedSession> {
@@ -114,12 +159,12 @@ export class AuthService {
       throw new InvalidRefreshTokenError();
     }
     // Inside the grace period the token is exchanged again: two tabs or a retried request.
-    const successor = generateRefreshToken();
+    const successor = generateOpaqueToken();
     await this.sessions.rotate({
       tokenId: stored.id,
       sessionId: stored.sessionId,
       rotatedAt: now,
-      successorHash: hashRefreshToken(successor),
+      successorHash: hashOpaqueToken(successor),
     });
     return this.issue(
       account,
@@ -133,7 +178,7 @@ export class AuthService {
     if (refreshToken === undefined) {
       return;
     }
-    const stored = await this.sessions.findToken(hashRefreshToken(refreshToken));
+    const stored = await this.sessions.findToken(hashOpaqueToken(refreshToken));
     if (stored) {
       await this.sessions.revokeSession(stored.sessionId, new Date());
     }
@@ -147,6 +192,37 @@ export class AuthService {
     return account;
   }
 
+  private async verifyCredentials(input: LoginRequest): Promise<AccountCredentials> {
+    const credentials = await this.accounts.findCredentialsByEmail(input.email);
+    if (!credentials) {
+      await this.hasher.verifyDummy(input.password);
+      this.logger.log({ reason: 'unknown_email' }, 'Login failed');
+      throw new InvalidCredentialsError();
+    }
+    const isValid = await this.hasher.verify(credentials.passwordHash, input.password);
+    if (!isValid) {
+      this.logger.log({ reason: 'wrong_password', userId: credentials.userId }, 'Login failed');
+      throw new InvalidCredentialsError();
+    }
+    return credentials;
+  }
+
+  private async enterJoinedWorkspace(
+    { account, inviteId }: JoinedAccount,
+    mode: 'register' | 'login',
+    presentedRefreshToken: string | undefined,
+    now: Date,
+  ): Promise<IssuedSession> {
+    this.logger.log(
+      { inviteId, mode, userId: account.user.id, workspaceId: account.workspace.id },
+      'Invite accepted',
+    );
+    // After the new session: a join refused at the session start leaves the browser signed in.
+    const session = await this.startSession(account, now);
+    await this.logout(presentedRefreshToken);
+    return session;
+  }
+
   private async findUsableToken(
     refreshToken: string | undefined,
     now: Date,
@@ -154,7 +230,7 @@ export class AuthService {
     if (refreshToken === undefined) {
       throw new InvalidRefreshTokenError();
     }
-    const stored = await this.sessions.findToken(hashRefreshToken(refreshToken));
+    const stored = await this.sessions.findToken(hashOpaqueToken(refreshToken));
     if (!stored || !isTokenUsable(stored, now)) {
       throw new InvalidRefreshTokenError();
     }
@@ -171,13 +247,17 @@ export class AuthService {
   }
 
   private async startSession(account: Account, now: Date): Promise<IssuedSession> {
-    const refreshToken = generateRefreshToken();
+    const refreshToken = generateOpaqueToken();
     const expiresAt = new Date(now.getTime() + SESSION_LIFETIME_MS);
     const sessionId = await this.sessions.createSession({
       userId: account.user.id,
       expiresAt,
-      tokenHash: hashRefreshToken(refreshToken),
+      tokenHash: hashOpaqueToken(refreshToken),
     });
+    // The member was removed after the account was read.
+    if (sessionId === null) {
+      throw new NoWorkspaceError();
+    }
     return this.issue(account, refreshToken, { id: sessionId, expiresAt }, now);
   }
 

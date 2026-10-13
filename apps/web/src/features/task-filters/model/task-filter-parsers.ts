@@ -1,30 +1,30 @@
 import { createLoader, createParser } from 'nuqs/server';
 import type { SearchParams } from 'nuqs/server';
 
+import { ANYONE, taskMemberFilterParser } from '@/entities/member';
 import type { TaskFilters } from '@/entities/task';
 
-// Each parameter has one value besides its default; any other value reads as the default.
-function exactParser<T extends string>(value: T): ReturnType<typeof createParser<T>> {
-  return createParser<T>({
-    parse: (query) => (query === value ? value : null),
-    serialize: () => value,
-  });
-}
+// Any status other than done reads as the default.
+const statusParser = createParser<'done'>({
+  parse: (query) => (query === 'done' ? 'done' : null),
+  serialize: () => 'done',
+});
 
 // Imported from nuqs/server, which has no 'use client', so the server page parses the same way.
 export const taskFilterParsers = {
-  assignee: exactParser('anyone'),
-  status: exactParser('done'),
+  assignee: taskMemberFilterParser.withDefault('me'),
+  status: statusParser,
 };
 
 interface TaskFilterValues {
-  readonly assignee: 'anyone' | null;
+  // "anyone", "me" or a member id.
+  readonly assignee: string;
   readonly status: 'done' | null;
 }
 
 export function toTaskFilters(values: TaskFilterValues): TaskFilters {
   return {
-    isMine: values.assignee !== 'anyone',
+    assignee: values.assignee === ANYONE ? null : values.assignee,
     status: values.status === 'done' ? 'done' : 'open',
   };
 }

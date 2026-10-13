@@ -34,6 +34,7 @@ import {
 import { unreadCountResponseSchema } from '@clientry/shared/notifications';
 import { taskListResponseSchema, taskSchema } from '@clientry/shared/tasks';
 import { memberListResponseSchema } from '@clientry/shared/workspaces';
+import type { MemberFilter } from '@clientry/shared/workspaces';
 
 const PREFETCH_TIMEOUT_MS = 1000;
 
@@ -209,6 +210,20 @@ export function prefetchMembers(queryClient: QueryClient, request: PrefetchReque
       retry: false,
     }),
   );
+}
+
+// With a member id in the URL the menu trigger names the member from the first render. The
+// caller's own id reads as "Me", which needs no names.
+export function prefetchFilterMembers(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+  filter: MemberFilter | null,
+): Promise<void> {
+  const { session } = request;
+  const ownId = session.status === 'authenticated' ? session.claims.sub : null;
+  return filter === null || filter === 'me' || filter === ownId
+    ? Promise.resolve()
+    : prefetchMembers(queryClient, request);
 }
 
 export function prefetchTaskList(

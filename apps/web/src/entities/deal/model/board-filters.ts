@@ -1,3 +1,6 @@
+import type { MemberFilter } from '@clientry/shared/workspaces';
+
 export interface BoardFilters {
-  readonly isMine: boolean;
+  // Null for anyone.
+  readonly assignee: MemberFilter | null;
 }

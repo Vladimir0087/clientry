@@ -25,7 +25,7 @@ type User = ReturnType<typeof userEvent.setup>;
 
 const DEAL_PATH = `/deals/${TEST_DEAL.id}`;
 const HEADING_ID = 'new-deal-heading';
-const OPEN_TASKS: TaskFilters = { isMine: true, status: 'open' };
+const OPEN_TASKS: TaskFilters = { assignee: 'me', status: 'open' };
 const NO_TASKS = { pages: [{ items: [], nextCursor: null }], pageParams: [null] };
 
 function answerCreate(resolver: Resolver): Request[] {

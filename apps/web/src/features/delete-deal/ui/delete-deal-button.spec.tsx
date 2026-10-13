@@ -23,7 +23,7 @@ import { renderWithProviders } from '../../../../test/render';
 const DEAL_PATH = `/api/deals/${TEST_DEAL.id}`;
 const MANAGER_SESSION = { ...TEST_SESSION, role: 'manager' as const };
 const OTHERS_DEAL: Deal = { ...TEST_DEAL, createdBy: OTHER_USER };
-const DEAL_TASKS: TaskFilters = { isMine: false, status: 'open', dealId: TEST_DEAL.id };
+const DEAL_TASKS: TaskFilters = { assignee: null, status: 'open', dealId: TEST_DEAL.id };
 const NO_TASKS = { pages: [{ items: [], nextCursor: null }], pageParams: [null] };
 
 function DealPage({ isShown }: { readonly isShown: boolean }): React.JSX.Element | null {

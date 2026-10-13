@@ -6,6 +6,7 @@ import { clientSourceSchema } from './client-source.js';
 import { CLIENT_LIMITS } from './limits.js';
 import { oneOrMany } from '../common/one-or-many.js';
 import { textSchema } from '../common/text.js';
+import { memberFilterSchema } from '../workspaces/member-filter.js';
 
 export const clientSortSchema = z.enum(['newest', 'oldest', 'name_asc', 'name_desc']);
 
@@ -19,7 +20,7 @@ export const clientListQuerySchema = z.object({
     .optional(),
   source: oneOrMany(clientSourceSchema, CLIENT_LIMITS.sources).optional(),
   tag: oneOrMany(clientTagSchema, CLIENT_LIMITS.tags).optional(),
-  createdBy: z.literal('me').optional(),
+  createdBy: memberFilterSchema.optional(),
   sort: clientSortSchema.default('newest'),
   cursor: z.string().max(CLIENT_LIMITS.cursor).optional(),
   limit: z.coerce

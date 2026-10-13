@@ -13,8 +13,8 @@ interface OptionSelectProps extends FieldControlProps {
   readonly options: readonly SelectOption[];
   readonly value: string | undefined;
   readonly onChange: (value: string) => void;
-  readonly onBlur: () => void;
-  readonly ref: React.Ref<HTMLButtonElement>;
+  readonly onBlur?: () => void;
+  readonly ref?: React.Ref<HTMLButtonElement>;
   readonly className?: string;
   readonly isDisabled?: boolean;
   readonly onOpen?: () => void;

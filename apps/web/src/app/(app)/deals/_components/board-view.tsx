@@ -9,12 +9,16 @@ import type * as React from 'react';
 
 import { BoardSkeleton, newDealPath, STAGES_PATH, useBoard } from '@/entities/deal';
 import { useSession } from '@/entities/session';
-import { OnlyMineToggle, useBoardFilters } from '@/features/deal-filters';
+import { BoardAssigneeMenu, useBoardFilters } from '@/features/deal-filters';
 import type { BoardFiltersState } from '@/features/deal-filters';
 import { Button } from '@/shared/ui/button';
 import { PageHeading } from '@/shared/ui/page-heading';
 import { RetryMessage } from '@/shared/ui/retry-message';
+import { hasPermission } from '@clientry/shared/auth';
 import type { Board } from '@clientry/shared/deals';
+
+import { useFilterSubject } from '../../_lib/use-filter-subject';
+import type { FilterSubject } from '../../_lib/use-filter-subject';
 
 const HEADING_ID = 'deals-heading';
 
@@ -27,7 +31,7 @@ function BoardActions(): React.JSX.Element {
   const session = useSession();
   return (
     <div className="flex flex-wrap gap-2">
-      {session.data?.role === 'owner' && (
+      {session.data !== undefined && hasPermission(session.data.role, 'stages.manage') && (
         <Button variant="outline" asChild>
           <Link href={STAGES_PATH}>Edit stages</Link>
         </Button>
@@ -44,21 +48,28 @@ function BoardActions(): React.JSX.Element {
 
 interface EmptyLineProps {
   readonly board: Board;
-  readonly isMine: boolean;
+  readonly subject: FilterSubject;
   readonly onShowAll: () => void;
 }
 
-function EmptyLine({ board, isMine, onShowAll }: EmptyLineProps): React.JSX.Element | null {
+function emptyText(subject: Exclude<FilterSubject, { kind: 'anyone' }>): string {
+  if (subject.kind === 'me') {
+    return 'No deals are assigned to you.';
+  }
+  return `No deals are assigned to ${subject.name ?? 'this member'}.`;
+}
+
+function EmptyLine({ board, subject, onShowAll }: EmptyLineProps): React.JSX.Element | null {
   const total = board.columns.reduce((sum, column) => sum + column.count, 0);
   if (total > 0) {
     return null;
   }
-  if (!isMine) {
+  if (subject.kind === 'anyone') {
     return <p className="text-muted-foreground">No deals yet. Add the first one with New deal.</p>;
   }
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <p className="text-muted-foreground">No deals are assigned to you.</p>
+      <p className="text-muted-foreground">{emptyText(subject)}</p>
       <Button variant="outline" size="sm" onClick={onShowAll}>
         Show all deals
       </Button>
@@ -73,6 +84,7 @@ interface BoardBodyProps {
 
 function BoardBody({ filters, onShowAll }: BoardBodyProps): React.JSX.Element {
   const board = useBoard(filters.filters);
+  const subject = useFilterSubject(filters.filters.assignee);
   if (board.data === undefined) {
     if (!board.isError) {
       return <BoardSkeleton />;
@@ -97,7 +109,7 @@ function BoardBody({ filters, onShowAll }: BoardBodyProps): React.JSX.Element {
       )}
     >
       {!board.isPlaceholderData && (
-        <EmptyLine board={board.data} isMine={filters.filters.isMine} onShowAll={onShowAll} />
+        <EmptyLine board={board.data} subject={subject} onShowAll={onShowAll} />
       )}
       <DealBoard board={board.data} headingId={HEADING_ID} isStale={board.isPlaceholderData} />
     </div>
@@ -106,11 +118,11 @@ function BoardBody({ filters, onShowAll }: BoardBodyProps): React.JSX.Element {
 
 export function BoardView(): React.JSX.Element {
   const filters = useBoardFilters();
-  const toggleRef = useRef<HTMLButtonElement>(null);
-  // Show all deals goes with the empty line, so the switch, now off, takes its focus.
+  const menuRef = useRef<HTMLButtonElement>(null);
+  // Show all deals goes with the empty line, so the menu, now on anyone, takes its focus.
   const handleShowAll = (): void => {
-    filters.setMine(false);
-    toggleRef.current?.focus();
+    filters.setAssignee(null);
+    menuRef.current?.focus();
   };
   return (
     <div className="flex flex-col gap-6">
@@ -119,7 +131,7 @@ export function BoardView(): React.JSX.Element {
         <BoardActions />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <OnlyMineToggle ref={toggleRef} state={filters} />
+        <BoardAssigneeMenu ref={menuRef} state={filters} />
       </div>
       <BoardBody filters={filters} onShowAll={handleShowAll} />
     </div>

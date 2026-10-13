@@ -1,8 +1,9 @@
-import { createLoader, createParser, parseAsBoolean, parseAsStringLiteral } from 'nuqs/server';
+import { createLoader, createParser, parseAsStringLiteral } from 'nuqs/server';
 import type { SearchParams, SingleParserBuilder } from 'nuqs/server';
 
 import { normalizeClientFilters } from '@/entities/client';
 import type { ClientFilters } from '@/entities/client';
+import { memberFilterParser } from '@/entities/member';
 import {
   CLIENT_LIMITS,
   clientSortSchema,
@@ -11,6 +12,7 @@ import {
 } from '@clientry/shared/clients';
 import type { ClientSource } from '@clientry/shared/clients';
 import { textSchema } from '@clientry/shared/common';
+import type { MemberFilter } from '@clientry/shared/workspaces';
 
 const SEPARATOR = ',';
 
@@ -56,7 +58,7 @@ export const clientFilterParsers = {
   q: searchParser.withDefault(''),
   source: listParser(parseSource, CLIENT_LIMITS.sources).withDefault([]),
   tags: listParser(parseTag, CLIENT_LIMITS.tags).withDefault([]),
-  mine: parseAsBoolean.withDefault(false),
+  createdBy: memberFilterParser,
   sort: parseAsStringLiteral(clientSortSchema.options).withDefault('newest'),
 };
 
@@ -64,7 +66,7 @@ export interface ClientFilterValues {
   readonly q: string;
   readonly source: readonly ClientSource[];
   readonly tags: readonly string[];
-  readonly mine: boolean;
+  readonly createdBy: MemberFilter | null;
   readonly sort: ClientFilters['sort'];
 }
 
@@ -73,7 +75,7 @@ export function toClientFilters(values: ClientFilterValues): ClientFilters {
     q: values.q,
     sources: values.source,
     tags: values.tags,
-    isMine: values.mine,
+    createdBy: values.createdBy,
     sort: values.sort,
   });
 }

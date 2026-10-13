@@ -34,6 +34,20 @@ describe('RegisterForm', () => {
     expect(screen.getByLabelText('Password')).toHaveAccessibleDescription(HINT);
   });
 
+  it('should keep focus in the empty field and show no error when the link to log in is pressed', async () => {
+    const user = userEvent.setup();
+    renderRegisterForm();
+    await user.click(screen.getByLabelText('Email'));
+
+    await user.pointer({
+      keys: '[MouseLeft>]',
+      target: screen.getByRole('link', { name: 'Log in' }),
+    });
+
+    expect(screen.getByLabelText('Email')).toHaveFocus();
+    expect(screen.queryByText('Enter your email')).not.toBeInTheDocument();
+  });
+
   it('should show one message per field when submitted empty', async () => {
     const requests = recordRequests('post', '/api/auth/register', () =>
       HttpResponse.json(TEST_SESSION),

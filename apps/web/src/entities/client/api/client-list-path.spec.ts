@@ -10,7 +10,7 @@ describe('clientListPath', () => {
       q: ' a ',
       sources: ['website', 'telegram'],
       tags: ['vip'],
-      isMine: true,
+      createdBy: 'me',
       sort: 'name_asc',
     });
 

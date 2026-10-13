@@ -136,11 +136,14 @@ describe('moveDealRequestSchema', () => {
 });
 
 describe('boardQuerySchema', () => {
-  it.each([{}, { assignee: 'me' }])('should accept the query when it is %j', (query) => {
-    expect(boardQuerySchema.safeParse(query).success).toBe(true);
-  });
+  it.each([{}, { assignee: 'me' }, { assignee: MEMBER_ID }])(
+    'should accept the query when it is %j',
+    (query) => {
+      expect(boardQuerySchema.safeParse(query).success).toBe(true);
+    },
+  );
 
-  it('should reject the assignee when it is not me', () => {
-    expect(failedPaths(boardQuerySchema.safeParse({ assignee: MEMBER_ID }))).toEqual(['assignee']);
+  it('should reject the assignee when it is neither me nor an id', () => {
+    expect(failedPaths(boardQuerySchema.safeParse({ assignee: 'someone' }))).toEqual(['assignee']);
   });
 });

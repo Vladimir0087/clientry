@@ -1,5 +1,6 @@
 import { ConflictError } from '../../common/errors/conflict.error.js';
 import { ForbiddenError } from '../../common/errors/forbidden.error.js';
+import { NotFoundError } from '../../common/errors/not-found.error.js';
 import { UnauthenticatedError } from '../../common/errors/unauthenticated.error.js';
 
 export class EmailTakenError extends ConflictError {
@@ -35,5 +36,18 @@ export class InsufficientRoleError extends ForbiddenError {
 export class NoWorkspaceError extends ForbiddenError {
   constructor() {
     super('NO_WORKSPACE', 'This account is not a member of any workspace');
+  }
+}
+
+// One answer for an unknown, used, revoked or expired link: the next step is the same.
+export class InviteInvalidError extends NotFoundError {
+  constructor() {
+    super('INVITE_INVALID', 'This invite link is invalid or has expired');
+  }
+}
+
+export class AlreadyInWorkspaceError extends ConflictError {
+  constructor() {
+    super('ALREADY_IN_WORKSPACE', 'This account already belongs to a workspace');
   }
 }

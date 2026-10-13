@@ -331,6 +331,25 @@ describe('TasksService', () => {
       await expect(service.reopen(OWNER, TASK.id)).resolves.toEqual(TASK);
       expect(tx.update).not.toHaveBeenCalled();
     });
+
+    it('should throw RequestValidationError on assigneeId and write nothing when the assignee of a reopened task is no member', async () => {
+      tx.findById.mockResolvedValue({ ...TASK, doneAt: '2026-10-13T08:00:00.000Z' });
+      tx.findMember.mockResolvedValue(null);
+
+      const result = service.reopen(OWNER, TASK.id);
+
+      await expect(result).rejects.toBeInstanceOf(RequestValidationError);
+      await expect(result).rejects.toMatchObject({
+        fieldErrors: [{ path: 'assigneeId', message: 'Choose a member' }],
+      });
+      expect(tx.update).not.toHaveBeenCalled();
+    });
+
+    it('should check no membership when a task is completed', async () => {
+      await service.complete(OWNER, TASK.id);
+
+      expect(tx.findMember).not.toHaveBeenCalled();
+    });
   });
 
   describe('delete', () => {

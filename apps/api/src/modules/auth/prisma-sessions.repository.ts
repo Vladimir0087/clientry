@@ -14,12 +14,21 @@ import { PrismaService } from '../../infra/prisma/prisma.service.js';
 export class PrismaSessionsRepository implements SessionsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createSession({ userId, expiresAt, tokenHash }: NewSession): Promise<string> {
-    const session = await this.prisma.session.create({
-      data: { userId, expiresAt, refreshTokens: { create: { tokenHash } } },
-      select: { id: true },
+  // The membership is read FOR SHARE: a removal waits for the new session and revokes it with the
+  // rest, or the session sees the member gone.
+  createSession({ userId, expiresAt, tokenHash }: NewSession): Promise<string | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const memberships = await tx.$queryRaw<unknown[]>`
+        SELECT 1 FROM memberships WHERE user_id = ${userId}::uuid FOR SHARE`;
+      if (memberships.length === 0) {
+        return null;
+      }
+      const session = await tx.session.create({
+        data: { userId, expiresAt, refreshTokens: { create: { tokenHash } } },
+        select: { id: true },
+      });
+      return session.id;
     });
-    return session.id;
   }
 
   // One statement: the membership row with an EXISTS check on the session's primary key.

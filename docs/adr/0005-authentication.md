@@ -1,6 +1,6 @@
 # 0005 — Authentication
 
-Status: accepted
+Status: accepted; @Roles and the remark on removal without session revocation are superseded by 0013
 Date: 2026-10-04
 
 ## Context

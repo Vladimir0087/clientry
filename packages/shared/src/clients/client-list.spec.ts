@@ -37,12 +37,15 @@ describe('clientListQuerySchema', () => {
     expect(clientListQuerySchema.safeParse({ source }).success).toBe(false);
   });
 
-  it('should reject createdBy when it is not me', () => {
-    const result = clientListQuerySchema.safeParse({
-      createdBy: '0199a3c4-5e6f-7a8b-9c0d-1e2f3a4b5c6d',
-    });
+  it.each(['me', '0199a3c4-5e6f-7a8b-9c0d-1e2f3a4b5c6d'])(
+    'should accept createdBy when it is %s',
+    (createdBy) => {
+      expect(clientListQuerySchema.parse({ createdBy }).createdBy).toBe(createdBy);
+    },
+  );
 
-    expect(result.success).toBe(false);
+  it('should reject createdBy when it is neither me nor an id', () => {
+    expect(clientListQuerySchema.safeParse({ createdBy: 'someone' }).success).toBe(false);
   });
 
   it('should reject q when it has 101 characters', () => {

@@ -91,7 +91,9 @@ describe('LoginForm', () => {
     await submit();
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('This account is not a member of any workspace.');
+    expect(alert).toHaveTextContent(
+      'This account is not a member of any workspace. Ask an owner for an invite link.',
+    );
     expect(alert).toHaveFocus();
   });
 
@@ -211,6 +213,20 @@ describe('LoginForm', () => {
       expect(mockRouter.replace).toHaveBeenCalled();
     });
     expect(screen.getByRole('button', { name: 'Log in' })).toBeDisabled();
+  });
+
+  it('should keep focus in the empty field and show no error when the link to registration is pressed', async () => {
+    const user = userEvent.setup();
+    renderLoginForm();
+    await user.click(screen.getByLabelText('Email'));
+
+    await user.pointer({
+      keys: '[MouseLeft>]',
+      target: screen.getByRole('link', { name: 'Create one' }),
+    });
+
+    expect(screen.getByLabelText('Email')).toHaveFocus();
+    expect(screen.queryByText('Enter your email')).not.toBeInTheDocument();
   });
 
   it('should keep next in the link to registration when next is given', () => {

@@ -1,9 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse } from 'msw';
 import type * as React from 'react';
-import { describe, expect, it } from 'vitest';
+import { toast } from 'sonner';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { TaskNotFound, TaskRowBody, taskKeys, useTask, useTasks } from '@/entities/task';
 import type { TaskFilters } from '@/entities/task';
@@ -13,13 +14,14 @@ import { createQueryClient } from '@/shared/api/query-client';
 import { CompleteTaskButton } from './complete-task-button';
 import { CompleteTaskCheckbox } from './complete-task-checkbox';
 import { held } from '../../../../test/held';
+import { mockRouter } from '../../../../test/mocks/router';
 import { problemResponse } from '../../../../test/msw/problem';
 import { recordRequests } from '../../../../test/msw/record';
 import { renderWithProviders } from '../../../../test/render';
 import { makeTaskPage, TEST_TASK } from '../../../../test/tasks';
 
-const FILTERS: TaskFilters = { isMine: true, status: 'open' };
-const DONE_FILTERS: TaskFilters = { isMine: true, status: 'done' };
+const FILTERS: TaskFilters = { assignee: 'me', status: 'open' };
+const DONE_FILTERS: TaskFilters = { assignee: 'me', status: 'done' };
 const COMPLETE_PATH = `/api/tasks/${TEST_TASK.id}/complete`;
 const REOPEN_PATH = `/api/tasks/${TEST_TASK.id}/reopen`;
 const DONE_TASK = { ...TEST_TASK, doneAt: '2026-10-12T10:00:00.000Z' };
@@ -299,6 +301,64 @@ describe('CompleteTaskCheckbox', () => {
 });
 
 describe('CompleteTaskButton', () => {
+  function renderDoneTaskOfFormerMember(): void {
+    recordRequests('post', REOPEN_PATH, () =>
+      problemResponse(400, 'VALIDATION_FAILED', {
+        errors: [{ path: 'assigneeId', message: 'Choose a member' }],
+      }),
+    );
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(taskKeys.detail(TEST_TASK.id), DONE_TASK);
+    renderWithProviders(<TaskPage />, queryClient);
+  }
+
+  it('should keep the task done and offer to edit it when its assignee is no longer a member', async () => {
+    const user = userEvent.setup();
+    renderDoneTaskOfFormerMember();
+
+    await user.click(await screen.findByRole('button', { name: 'Reopen' }));
+    // A plain click: user-event's focus change hands sonner a relatedTarget jsdom cannot focus.
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit task' }));
+
+    expect(
+      screen.getByText(
+        'The assignee is no longer in the workspace. Choose another one to reopen this task.',
+      ),
+    ).toBeInTheDocument();
+    expect(mockRouter.push).toHaveBeenCalledWith(`/tasks/${TEST_TASK.id}/edit`);
+  });
+
+  it('should drop Edit task from the toast when a later toggle fails for another reason', async () => {
+    const user = userEvent.setup();
+    renderDoneTaskOfFormerMember();
+    await user.click(await screen.findByRole('button', { name: 'Reopen' }));
+    await screen.findByRole('button', { name: 'Edit task' });
+    recordRequests('post', REOPEN_PATH, () => problemResponse(500, 'INTERNAL_SERVER_ERROR'));
+
+    await user.click(screen.getByRole('button', { name: 'Reopen' }));
+
+    expect(await screen.findByText('Could not update the task. Try again.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit task' })).not.toBeInTheDocument();
+  });
+
+  it('should keep the Edit task toast for 10 seconds when its assignee is no longer a member', async () => {
+    const showError = vi.spyOn(toast, 'error');
+    onTestFinished(() => {
+      showError.mockRestore();
+    });
+    const user = userEvent.setup();
+    renderDoneTaskOfFormerMember();
+
+    await user.click(await screen.findByRole('button', { name: 'Reopen' }));
+
+    await waitFor(() => {
+      expect(showError).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ duration: 10_000 }),
+      );
+    });
+  });
+
   it('should turn Mark as done into Reopen on the task page when it is pressed', async () => {
     recordRequests('post', COMPLETE_PATH, () => HttpResponse.json(DONE_TASK));
     const user = userEvent.setup();

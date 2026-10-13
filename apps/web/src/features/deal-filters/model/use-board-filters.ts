@@ -1,6 +1,7 @@
 import { useQueryStates } from 'nuqs';
 
 import type { BoardFilters } from '@/entities/deal';
+import type { MemberFilter } from '@clientry/shared/workspaces';
 
 import { boardFilterParsers, toBoardFilters } from './board-filter-parsers';
 
@@ -9,16 +10,16 @@ const URL_OPTIONS = { history: 'replace', shallow: true } as const;
 
 export interface BoardFiltersState {
   readonly filters: BoardFilters;
-  readonly setMine: (isMine: boolean) => void;
+  readonly setAssignee: (assignee: MemberFilter | null) => void;
 }
 
+// Anyone is left out of the URL.
 export function useBoardFilters(): BoardFiltersState {
   const [values, setValues] = useQueryStates(boardFilterParsers, URL_OPTIONS);
   return {
     filters: toBoardFilters(values),
-    // Off is left out of the URL rather than written as false.
-    setMine: (isMine) => {
-      void setValues({ mine: isMine ? true : null });
+    setAssignee: (assignee) => {
+      void setValues({ assignee });
     },
   };
 }

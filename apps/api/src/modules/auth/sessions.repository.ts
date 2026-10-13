@@ -35,8 +35,8 @@ export interface LiveSessionLookup {
 }
 
 export abstract class SessionsRepository {
-  // Returns the new session's id.
-  abstract createSession(session: NewSession): Promise<string>;
+  // Returns the new session's id, or null when the user is no longer a member.
+  abstract createSession(session: NewSession): Promise<string | null>;
   // Null unless the session belongs to the user, is not revoked, has not ended, and the user is
   // still a member.
   abstract findLiveMembership(lookup: LiveSessionLookup): Promise<Membership | null>;

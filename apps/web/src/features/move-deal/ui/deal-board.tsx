@@ -19,10 +19,11 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { cn } from 'cn';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useMemo } from 'react';
 import type * as React from 'react';
 
-import { useMoveDeal } from '@/entities/deal';
+import { editDealPath, useMoveDeal } from '@/entities/deal';
 import { isFocusStranded } from '@/shared/lib/is-focus-stranded';
 import type { Board, BoardColumn as BoardColumnData, DealCard } from '@clientry/shared/deals';
 
@@ -157,7 +158,10 @@ export function DealBoard({
 }: DealBoardProps): React.JSX.Element {
   // A fixed id keeps dnd-kit's generated ids equal on the server and in the browser.
   const dndId = useId();
-  const move = useMoveDeal('board');
+  const router = useRouter();
+  const move = useMoveDeal('board', (dealId) => {
+    router.push(editDealPath(dealId));
+  });
   const focus = useCardFocus(move.mutateAsync);
   const drag = useBoardDrag(board, focus.handleDrop);
   useGoneCardFocus(board, focus, headingId);

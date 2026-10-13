@@ -17,6 +17,7 @@ describe('resolveRedirectTarget', () => {
     ['a javascript URL', 'javascript:alert(1)'],
     ['the login page', '/login'],
     ['the register page', '/register?next=/x'],
+    ['the join page', '/join'],
     ['an empty value', ''],
   ])('should fall back to / when next is %s', (_case, next) => {
     expect(resolveRedirectTarget(next, APP_ORIGIN)).toBe('/');

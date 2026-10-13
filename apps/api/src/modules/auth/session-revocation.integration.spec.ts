@@ -9,7 +9,7 @@ import { createTestApp } from '../../../test/create-test-app.js';
 import type { TestApp } from '../../../test/create-test-app.js';
 import { findSessionId, registerAccount } from '../../../test/fixtures/accounts.js';
 import { resetDatabase } from '../../../test/reset-database.js';
-import { refreshTokenHash, signAccessToken } from '../../../test/support/auth-tokens.js';
+import { opaqueTokenHash, signAccessToken } from '../../../test/support/auth-tokens.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
 
 describe('session revocation', () => {
@@ -59,7 +59,7 @@ describe('session revocation', () => {
     const { accessToken, refreshToken } = await registerAccount(testApp);
     await postWithRefresh('/api/auth/refresh', refreshToken).expect(200);
     await prisma.refreshToken.update({
-      where: { tokenHash: refreshTokenHash(refreshToken) },
+      where: { tokenHash: opaqueTokenHash(refreshToken) },
       data: { rotatedAt: new Date(Date.now() - 31_000) },
     });
 

@@ -8,8 +8,8 @@ export function taskListPath(filters: TaskFilters, cursor: string | null): ApiPa
   if (filters.status === 'done') {
     params.set('status', 'done');
   }
-  if (filters.isMine) {
-    params.set('assignee', 'me');
+  if (filters.assignee !== null) {
+    params.set('assignee', filters.assignee);
   }
   if (filters.clientId !== undefined) {
     params.set('clientId', filters.clientId);

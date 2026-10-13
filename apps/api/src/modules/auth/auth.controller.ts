@@ -15,20 +15,34 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
 import {
+  inviteLoginRequestSchema,
+  invitePreviewRequestSchema,
+  invitePreviewResponseSchema,
+  inviteRegisterRequestSchema,
   loginRequestSchema,
   registerRequestSchema,
   sessionResponseSchema,
 } from '@clientry/shared/auth';
-import type { LoginRequest, RegisterRequest, SessionResponse } from '@clientry/shared/auth';
+import type {
+  InviteLoginRequest,
+  InvitePreviewRequest,
+  InvitePreviewResponse,
+  InviteRegisterRequest,
+  LoginRequest,
+  RegisterRequest,
+  SessionResponse,
+} from '@clientry/shared/auth';
 
 import { AuthCookies } from './auth-cookies.js';
 import { AuthService } from './auth.service.js';
 import type { IssuedSession } from './auth.service.js';
 import {
+  AlreadyInWorkspaceError,
   AuthenticationRequiredError,
   EmailTakenError,
   InvalidCredentialsError,
   InvalidRefreshTokenError,
+  InviteInvalidError,
   NoWorkspaceError,
 } from './errors.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
@@ -37,6 +51,7 @@ import { Public } from '../../common/auth/public.decorator.js';
 import { UntrustedOriginError } from '../../common/guards/untrusted-origin.error.js';
 import {
   ApiErrorResponse,
+  ApiInvalidRequest,
   ApiUntrustedOrigin,
 } from '../../common/http/api-error-response.decorator.js';
 import { ApiProblemResponse } from '../../common/http/api-problem-response.decorator.js';
@@ -110,6 +125,62 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<SessionResponse> {
     return this.respond(response, await this.auth.login(input));
+  }
+
+  // POST, not GET: the token stays out of URLs and request logs. It changes nothing.
+  @Post('invite/preview')
+  @Public()
+  @ApiOperation({ summary: 'The workspace, inviter and expiry of a pending invite' })
+  @ResponseSchema(HttpStatus.OK, invitePreviewResponseSchema)
+  @ApiInvalidRequest('/api/auth/invite/preview', 'token', 'Invalid invite link')
+  @ApiUntrustedOrigin('/api/auth/invite/preview')
+  @ApiErrorResponse(HttpStatus.NOT_FOUND, '/api/auth/invite/preview', new InviteInvalidError())
+  @RateLimit(30, MINUTE_MS, '/api/auth/invite/preview')
+  previewInvite(
+    @Body({ schema: invitePreviewRequestSchema }) { token }: InvitePreviewRequest,
+  ): Promise<InvitePreviewResponse> {
+    return this.auth.previewInvite(token);
+  }
+
+  @Post('invite/register')
+  @Public()
+  @ApiOperation({ summary: 'Create an account that joins the workspace of an invite as a manager' })
+  @ResponseSchema(HttpStatus.CREATED, sessionResponseSchema)
+  @ApiInvalidRequest('/api/auth/invite/register', 'password', 'Use at least 12 characters')
+  @ApiUntrustedOrigin('/api/auth/invite/register')
+  @ApiErrorResponse(HttpStatus.NOT_FOUND, '/api/auth/invite/register', new InviteInvalidError())
+  @ApiErrorResponse(HttpStatus.CONFLICT, '/api/auth/invite/register', new EmailTakenError())
+  @RateLimit(10, HOUR_MS, '/api/auth/invite/register')
+  async registerByInvite(
+    @Body({ schema: inviteRegisterRequestSchema }) input: InviteRegisterRequest,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<SessionResponse> {
+    const presented = this.cookies.readRefreshToken(request);
+    return this.respond(response, await this.auth.registerByInvite(input, presented));
+  }
+
+  @Post('invite/login')
+  @Public()
+  @ApiOperation({ summary: 'Sign in with an account without a workspace and join an invite' })
+  @ResponseSchema(HttpStatus.OK, sessionResponseSchema)
+  @ApiInvalidRequest('/api/auth/invite/login', 'email', 'Enter a valid email')
+  @ApiErrorResponse(
+    HttpStatus.UNAUTHORIZED,
+    '/api/auth/invite/login',
+    new InvalidCredentialsError(),
+  )
+  @ApiUntrustedOrigin('/api/auth/invite/login')
+  @ApiErrorResponse(HttpStatus.NOT_FOUND, '/api/auth/invite/login', new InviteInvalidError())
+  @ApiErrorResponse(HttpStatus.CONFLICT, '/api/auth/invite/login', new AlreadyInWorkspaceError())
+  @RateLimit(10, MINUTE_MS, '/api/auth/invite/login')
+  async loginByInvite(
+    @Body({ schema: inviteLoginRequestSchema }) input: InviteLoginRequest,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<SessionResponse> {
+    const presented = this.cookies.readRefreshToken(request);
+    return this.respond(response, await this.auth.loginByInvite(input, presented));
   }
 
   @Post('refresh')

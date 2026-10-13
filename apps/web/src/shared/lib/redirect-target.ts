@@ -2,15 +2,22 @@ import type { Route } from 'next';
 
 export const LOGIN_PATH = '/login';
 export const REGISTER_PATH = '/register';
+export const JOIN_PATH = '/join';
 export const NEXT_PARAM = 'next';
 
 const HOME_PATH = '/';
 const AUTH_PATHS: ReadonlySet<string> = new Set([LOGIN_PATH, REGISTER_PATH]);
+// Rendered in every session state: the page decides what a signed-in visitor sees.
+const PUBLIC_PATHS: ReadonlySet<string> = new Set([JOIN_PATH]);
 
 type AuthPath = typeof LOGIN_PATH | typeof REGISTER_PATH;
 
 export function isAuthPath(pathname: string): boolean {
   return AUTH_PATHS.has(pathname);
+}
+
+export function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname);
 }
 
 // Parsed, not prefix-checked: browsers read "//host", "/\host" and "/<tab>/host" as another origin.
@@ -20,7 +27,7 @@ export function resolveRedirectTarget(next: string | null | undefined, appOrigin
     return HOME_PATH;
   }
   const url = new URL(next, appOrigin);
-  if (url.origin !== appOrigin || isAuthPath(url.pathname)) {
+  if (url.origin !== appOrigin || isAuthPath(url.pathname) || isPublicPath(url.pathname)) {
     return HOME_PATH;
   }
   return `${url.pathname}${url.search}${url.hash}` as Route;

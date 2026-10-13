@@ -39,26 +39,32 @@ const passwordSchema = z
   .min(1, required('Enter your password'))
   .max(MAX_PASSWORD_LENGTH, tooLong(MAX_PASSWORD_LENGTH));
 
+const newPasswordSchema = passwordSchema.min(
+  MIN_PASSWORD_LENGTH,
+  `Use at least ${String(MIN_PASSWORD_LENGTH)} characters`,
+);
+
+export const workspaceNameSchema = nameSchema('Enter a workspace name');
+
+// The fields of a new account, shared by registration and joining by invite.
+export const newAccountFields = {
+  email: emailSchema,
+  password: newPasswordSchema,
+  name: nameSchema('Enter your name'),
+};
+
+// Only presence is checked, so a stricter policy later never locks out existing accounts.
+export const loginFields = {
+  email: emailSchema,
+  password: passwordSchema,
+};
+
 export const registerRequestSchema = z
-  .object({
-    email: emailSchema,
-    password: passwordSchema.min(
-      MIN_PASSWORD_LENGTH,
-      `Use at least ${String(MIN_PASSWORD_LENGTH)} characters`,
-    ),
-    name: nameSchema('Enter your name'),
-    workspaceName: nameSchema('Enter a workspace name'),
-  })
+  .object({ ...newAccountFields, workspaceName: workspaceNameSchema })
   .meta({ id: 'RegisterRequest' });
 
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 
-// Only presence is checked, so a stricter policy later never locks out existing accounts.
-export const loginRequestSchema = z
-  .object({
-    email: emailSchema,
-    password: passwordSchema,
-  })
-  .meta({ id: 'LoginRequest' });
+export const loginRequestSchema = z.object(loginFields).meta({ id: 'LoginRequest' });
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;

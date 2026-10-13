@@ -3,7 +3,8 @@
 import { LogOutIcon, UserIcon } from 'lucide-react';
 import type * as React from 'react';
 
-import { roleLabel, useSession } from '@/entities/session';
+import { useSession } from '@/entities/session';
+import { roleLabel } from '@/shared/lib/role-label';
 import { Button } from '@/shared/ui/button';
 import {
   DropdownMenu,

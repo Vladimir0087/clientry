@@ -5,8 +5,8 @@ import { stageKeys } from '@/entities/deal';
 import { sessionKeys } from '@/entities/session';
 import { ApiError } from '@/shared/api/api-error';
 import { hasErrorCode, isNotFound } from '@/shared/api/api-status';
+import { GENERIC_MESSAGE } from '@/shared/lib/submit-error';
 
-const GENERIC_MESSAGE = 'Something went wrong. Try again.';
 // Their detail says what rule the change broke; the list is refetched to show why.
 const RULE_CODES = ['STAGE_LIMIT_REACHED', 'LAST_OPEN_STAGE', 'STAGE_NOT_DELETABLE'] as const;
 

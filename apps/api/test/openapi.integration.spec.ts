@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from './create-test-app.js';
 import type { TestApp } from './create-test-app.js';
 import { TestOnlyModule } from './support/test-only.module.js';
+import { PERMISSION_OPERATION_EXTENSION } from '../src/common/auth/require-permission.decorator.js';
 
 const PROBLEM_REF = { $ref: '#/components/schemas/ApiProblem' };
 
@@ -281,7 +282,7 @@ describe('OpenAPI document', () => {
     );
   });
 
-  describe('deals, stages, members, tasks and notifications operations', () => {
+  describe('deals, stages, tasks and notifications operations', () => {
     const OPERATIONS = [
       ['get', '/api/deals/board', 'deals'],
       ['get', '/api/deals', 'deals'],
@@ -297,7 +298,6 @@ describe('OpenAPI document', () => {
       ['patch', '/api/stages/{id}', 'stages'],
       ['put', '/api/stages/order', 'stages'],
       ['delete', '/api/stages/{id}', 'stages'],
-      ['get', '/api/members', 'members'],
       ['get', '/api/tasks', 'tasks'],
       ['post', '/api/tasks', 'tasks'],
       ['get', '/api/tasks/{id}', 'tasks'],
@@ -343,9 +343,9 @@ describe('OpenAPI document', () => {
       return (op?.parameters ?? []).filter((p) => p.in === location).map(({ name }) => name);
     }
 
-    it('should document 27 operations under deals, stages, members, tasks and notifications when the document is built', () => {
+    it('should document 26 operations under deals, stages, tasks and notifications when the document is built', () => {
       const paths = Object.entries(document.paths as Record<string, Record<string, unknown>>)
-        .filter(([path]) => /^\/api\/(deals|stages|members|tasks|notifications)/.test(path))
+        .filter(([path]) => /^\/api\/(deals|stages|tasks|notifications)/.test(path))
         .flatMap(([path, item]) => Object.keys(item).map((method) => `${method} ${path}`));
 
       expect(paths.toSorted()).toEqual(
@@ -441,6 +441,172 @@ describe('OpenAPI document', () => {
         expect(parameterNames(operation(method, path), 'path')).toEqual(['id']);
       },
     );
+  });
+
+  describe('team operations', () => {
+    const JOIN_OPERATIONS = [
+      ['post', '/api/auth/invite/preview', 'auth'],
+      ['post', '/api/auth/invite/register', 'auth'],
+      ['post', '/api/auth/invite/login', 'auth'],
+    ] as const;
+
+    const MEMBER_OPERATIONS = [
+      ['get', '/api/members', 'members'],
+      ['patch', '/api/members/{id}', 'members'],
+      ['delete', '/api/members/{id}', 'members'],
+      ['get', '/api/invites', 'invites'],
+      ['post', '/api/invites', 'invites'],
+      ['delete', '/api/invites/{id}', 'invites'],
+      ['patch', '/api/workspace', 'workspace'],
+    ] as const;
+
+    const TEAM_OPERATIONS = [...JOIN_OPERATIONS, ...MEMBER_OPERATIONS];
+
+    interface Parameter {
+      readonly name: string;
+      readonly in: string;
+    }
+
+    interface ProblemContent {
+      readonly schema?: unknown;
+      readonly example?: { readonly code?: string };
+      readonly examples?: Record<string, unknown>;
+    }
+
+    interface Operation {
+      readonly tags?: readonly string[];
+      readonly security?: unknown;
+      readonly parameters?: readonly Parameter[];
+      readonly [PERMISSION_OPERATION_EXTENSION]?: string;
+      readonly responses?: Record<string, { content?: Record<string, ProblemContent> }>;
+    }
+
+    function operations(): [string, Operation][] {
+      const paths = document.paths as Record<string, Record<string, Operation>>;
+      return Object.entries(paths).flatMap(([path, item]) =>
+        Object.entries(item).map(([method, op]): [string, Operation] => [`${method} ${path}`, op]),
+      );
+    }
+
+    function operation(method: string, path: string): Operation | undefined {
+      const paths = document.paths as Record<string, Record<string, Operation> | undefined>;
+      return paths[path]?.[method];
+    }
+
+    function parameterNames(op: Operation | undefined, location: string): string[] {
+      return (op?.parameters ?? []).filter((p) => p.in === location).map(({ name }) => name);
+    }
+
+    function forbiddenCodes(op: Operation): string[] {
+      const content = op.responses?.['403']?.content?.['application/problem+json'];
+      return [content?.example?.code ?? '', ...Object.keys(content?.examples ?? {})];
+    }
+
+    it('should document the member, invite and workspace operations when the document is built', () => {
+      const paths = operations()
+        .map(([name]) => name)
+        .filter((name) => /^\w+ \/api\/(members|invites|workspace)/.test(name));
+
+      expect(paths.toSorted()).toEqual(
+        MEMBER_OPERATIONS.map(([method, path]) => `${method} ${path}`).toSorted(),
+      );
+    });
+
+    it.each(JOIN_OPERATIONS)(
+      'should tag %s %s under auth with no security when it is documented',
+      (method, path, tag) => {
+        const op = operation(method, path);
+
+        expect(op?.tags).toEqual([tag]);
+        expect(op?.security).toEqual([]);
+      },
+    );
+
+    it.each(MEMBER_OPERATIONS)(
+      'should tag, require the access cookie and document 401 when %s %s is documented',
+      (method, path, tag) => {
+        const op = operation(method, path);
+
+        expect(op?.tags).toEqual([tag]);
+        expect(op?.security).toEqual([{ accessCookie: [] }]);
+        expect(op?.responses?.['401']).toBeDefined();
+      },
+    );
+
+    it.each(TEAM_OPERATIONS)(
+      'should reference ApiProblem in every error response when %s %s is documented',
+      (method, path) => {
+        const errors = Object.entries(operation(method, path)?.responses ?? {}).filter(
+          ([status]) => Number(status) >= 400,
+        );
+
+        expect(errors.length).toBeGreaterThan(0);
+        for (const [, response] of errors) {
+          expect(response.content?.['application/problem+json']?.schema).toEqual(PROBLEM_REF);
+        }
+      },
+    );
+
+    it('should name the permission of every restricted operation when the document is built', () => {
+      const permissions = Object.fromEntries(
+        operations().flatMap(([name, op]) => {
+          const permission = op[PERMISSION_OPERATION_EXTENSION];
+          return permission === undefined ? [] : [[name, permission]];
+        }),
+      );
+
+      expect(permissions).toEqual({
+        'post /api/stages': 'stages.manage',
+        'put /api/stages/order': 'stages.manage',
+        'patch /api/stages/{id}': 'stages.manage',
+        'delete /api/stages/{id}': 'stages.manage',
+        'patch /api/members/{id}': 'team.manage',
+        'delete /api/members/{id}': 'team.manage',
+        'get /api/invites': 'team.manage',
+        'post /api/invites': 'team.manage',
+        'delete /api/invites/{id}': 'team.manage',
+        'patch /api/workspace': 'workspace.manage',
+        'get /api/test/protected/owner': 'workspace.manage',
+      });
+    });
+
+    it('should list 403 INSUFFICIENT_ROLE on every operation behind a permission when the document is built', () => {
+      const restricted = operations().filter(
+        ([, op]) => op[PERMISSION_OPERATION_EXTENSION] !== undefined,
+      );
+
+      expect(restricted.length).toBeGreaterThan(0);
+      for (const [name, op] of restricted) {
+        expect({ name, codes: forbiddenCodes(op) }).toEqual({
+          name,
+          codes: expect.arrayContaining(['INSUFFICIENT_ROLE']) as unknown,
+        });
+      }
+    });
+
+    it.each(MEMBER_OPERATIONS.filter(([, path]) => path.includes('{id}')))(
+      'should document the id path parameter when %s %s is documented',
+      (method, path) => {
+        expect(parameterNames(operation(method, path), 'path')).toEqual(['id']);
+      },
+    );
+
+    it('should list transferTo as the query parameter when member removal is documented', () => {
+      expect(parameterNames(operation('delete', '/api/members/{id}'), 'query')).toEqual([
+        'transferTo',
+      ]);
+    });
+
+    it('should give a 400 example for the id and one for transferTo when member removal is documented', () => {
+      const content = operation('delete', '/api/members/{id}')?.responses?.['400']?.content?.[
+        'application/problem+json'
+      ];
+
+      expect(Object.keys(content?.examples ?? {}).toSorted()).toEqual([
+        'VALIDATION_FAILED id',
+        'VALIDATION_FAILED transferTo',
+      ]);
+    });
   });
 
   it('should leave health probes out when the document is built', () => {

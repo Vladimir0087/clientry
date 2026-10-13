@@ -4,6 +4,7 @@ import { currencySchema } from './currency.js';
 import { DEAL_LIMITS } from './limits.js';
 import { idSchema } from '../common/id.js';
 import { textSchema } from '../common/text.js';
+import { memberFilterSchema } from '../workspaces/member-filter.js';
 
 const titleSchema = textSchema
   .trim()
@@ -60,6 +61,6 @@ export const dealListQuerySchema = z.object({ clientId: idSchema() });
 
 export type DealListQuery = z.infer<typeof dealListQuerySchema>;
 
-export const boardQuerySchema = z.object({ assignee: z.literal('me').optional() });
+export const boardQuerySchema = z.object({ assignee: memberFilterSchema.optional() });
 
 export type BoardQuery = z.infer<typeof boardQuerySchema>;

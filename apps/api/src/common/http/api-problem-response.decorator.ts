@@ -14,6 +14,12 @@ export interface ProblemExample {
   readonly errors?: ApiProblem['errors'];
 }
 
+// Validation examples share a code, so the field tells them apart.
+function exampleName({ code, errors }: ApiProblem): string {
+  const path = errors?.[0]?.path;
+  return path === undefined ? code : `${code} ${path}`;
+}
+
 // One status can answer with several codes; each becomes a named example.
 export function ApiProblemResponse(
   status: number,
@@ -31,6 +37,9 @@ export function ApiProblemResponse(
   if (bodies.length === 1) {
     return ApiResponse({ ...common, example: bodies[0] });
   }
-  const named = bodies.map((body) => [body.code, { summary: body.code, value: body }] as const);
+  const named = bodies.map((body) => {
+    const name = exampleName(body);
+    return [name, { summary: name, value: body }] as const;
+  });
   return ApiResponse({ ...common, examples: Object.fromEntries(named) });
 }
