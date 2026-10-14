@@ -11,10 +11,12 @@ import type { AppConfig } from './infra/config/app-config.js';
 import { AppConfigModule } from './infra/config/app-config.module.js';
 import { AppLoggerModule } from './infra/logger/app-logger.module.js';
 import { QueueModule } from './infra/queue/queue.module.js';
+import { ActivityModule } from './modules/activity/activity.module.js';
 import { AccessTokenGuard } from './modules/auth/access-token.guard.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { PermissionsGuard } from './modules/auth/permissions.guard.js';
 import { ClientsModule } from './modules/clients/clients.module.js';
+import { DashboardModule } from './modules/dashboard/dashboard.module.js';
 import { DealsModule } from './modules/deals/deals.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
@@ -37,8 +39,10 @@ export class AppModule {
         AppConfigModule.forRoot(config),
         AppLoggerModule.forRoot(logger),
         QueueModule.forRoot({ shouldRunJobs }),
+        ActivityModule,
         AuthModule,
         ClientsModule,
+        DashboardModule,
         DealsModule,
         HealthModule,
         NotificationsModule,

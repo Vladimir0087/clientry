@@ -34,6 +34,22 @@ describe('MainNav', () => {
     expect(screen.getByRole('link', { name: 'Clients' })).not.toHaveAttribute('aria-current');
   });
 
+  it('should list Dashboard first and mark it as the current page when the path is /', () => {
+    render(<MainNav />);
+
+    const [first] = screen.getAllByRole('link');
+    expect(first).toHaveAccessibleName('Dashboard');
+    expect(first).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('should not mark Dashboard when the path is /deals', () => {
+    mockPathname.current = '/deals';
+
+    render(<MainNav />);
+
+    expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
+  });
+
   it.each(['/tasks', '/tasks/0199c2a1-1a2b-7c3d-8e4f-000000000001'])(
     'should mark only Tasks as the current page when the path is %s',
     (path) => {

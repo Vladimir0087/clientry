@@ -1,4 +1,4 @@
-import type { ModuleMetadata } from '@nestjs/common';
+import type { InjectionToken, ModuleMetadata } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { ThrottlerGuard } from '@nestjs/throttler';
@@ -16,6 +16,11 @@ import { createLogger } from '../src/infra/logger/create-logger.js';
 export const UNREACHABLE_DATABASE_URL = 'postgresql://clientry:clientry@127.0.0.1:1/clientry';
 export const UNREACHABLE_REDIS_URL = 'redis://127.0.0.1:1';
 
+export interface ProviderOverride {
+  readonly token: InjectionToken;
+  readonly value: unknown;
+}
+
 export interface TestAppOverrides {
   readonly databaseUrl?: string;
   readonly redisUrl?: string;
@@ -25,6 +30,8 @@ export interface TestAppOverrides {
   readonly isRateLimited?: boolean;
   // Off by default: a background sweep would land in the SQL statement counts of other tests.
   readonly shouldRunJobs?: boolean;
+  // Replaces providers, e.g. a writer that throws to prove a write rolls back.
+  readonly providers?: readonly ProviderOverride[];
 }
 
 export interface TestApp {
@@ -59,6 +66,9 @@ export async function createTestApp(overrides: TestAppOverrides = {}): Promise<T
   });
   if (overrides.isRateLimited !== true) {
     builder.overrideGuard(ThrottlerGuard).useValue({ canActivate: () => true });
+  }
+  for (const { token, value } of overrides.providers ?? []) {
+    builder.overrideProvider(token).useValue(value);
   }
   const moduleRef = await builder.compile();
   const app = await createApp((adapter, options) =>

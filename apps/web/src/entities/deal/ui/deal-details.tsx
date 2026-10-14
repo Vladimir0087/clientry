@@ -1,10 +1,9 @@
 import { useId } from 'react';
 import type * as React from 'react';
 
+import { formatMoney } from '@/shared/lib/money';
 import { LocalDate } from '@/shared/ui/local-date';
 import type { Deal } from '@clientry/shared/deals';
-
-import { formatMoney } from '../model/money';
 
 interface DetailProps {
   readonly label: string;

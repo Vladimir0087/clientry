@@ -324,7 +324,7 @@ named param reports its issue with an empty path, so the field error would read 
 ### Out of scope
 
 - Deals and tasks on the client card (specs 07, 08); activity entries for client events (specs 07
-  and 10 decide); demo clients (spec 11); CSV import, custom fields (v2).
+  and 10 decide); demo clients (spec 12); CSV import, custom fields (v2).
 - Filtering by any member (`createdBy=<id>`) and a member picker (spec 09); a responsible manager
   separate from the creator.
 - Duplicate detection, phone normalization, a trash view, bulk actions, export, a total count,
@@ -593,7 +593,7 @@ scroll, and by keyboard only.
   - Auth forms pass unchanged after the form pieces move.
   - The default MSW handlers gain `GET /api/clients/tags` with an empty list: the list page and the
     form request it on mount, and unhandled requests fail tests.
-- **e2e**: none (spec 12).
+- **e2e**: none (spec 13).
 - **Tooling checks**, done once on throwaway changes that are not committed; each must fail:
   - `features/client-form` importing `@/features/client-filters` (lint);
   - `entities/client` importing `@/features/delete-client` (lint);

@@ -1,16 +1,23 @@
 import type { Task, TaskRef, TaskRelatedRequest } from '@clientry/shared/tasks';
 
-import {
-  deletedButLinksVisible,
-  findLockedTask,
-  findTask,
-  lockTask,
-  TASK_LINK_JOINS,
-  TASK_LINKS_VISIBLE,
-  visible,
-} from './task-reads.repository.js';
-import type { NewTask, TaskOwnership, TasksTransaction, TaskWrite } from './tasks.repository.js';
+import { findLockedTask, findTask, lockTask } from './task-reads.repository.js';
+import type {
+  NewTask,
+  TaskEvent,
+  TaskOwnership,
+  TasksTransaction,
+  TaskWrite,
+} from './tasks.repository.js';
 import type { Prisma } from '../../infra/prisma/generated/client.js';
+import {
+  deletedTaskWithVisibleLinks,
+  taskLinkJoins,
+  taskLinksVisible,
+  visibleTask,
+} from '../../infra/prisma/visibility.js';
+import type { ActivityLog } from '../activity/activity-log.repository.js';
+
+const TASK = { task: 't', client: 'c', deal: 'd', dealClient: 'dc' } as const;
 
 interface OwnershipRow {
   readonly created_by_id: string;
@@ -52,7 +59,10 @@ function toData(write: TaskWrite): Prisma.TaskUncheckedUpdateManyInput {
 }
 
 export class PrismaTasksTransaction implements TasksTransaction {
-  constructor(private readonly tx: Prisma.TransactionClient) {}
+  constructor(
+    private readonly tx: Prisma.TransactionClient,
+    private readonly activityLog: ActivityLog,
+  ) {}
 
   findById(workspaceId: string, id: string): Promise<Task | null> {
     return findLockedTask(this.tx, workspaceId, id);
@@ -115,7 +125,7 @@ export class PrismaTasksTransaction implements TasksTransaction {
 
   async update(workspaceId: string, id: string, write: TaskWrite): Promise<Task | null> {
     const { count } = await this.tx.task.updateMany({
-      where: { id, ...visible(workspaceId) },
+      where: { id, ...visibleTask(workspaceId) },
       data: toData(write),
     });
     // The update holds the row lock already.
@@ -128,9 +138,9 @@ export class PrismaTasksTransaction implements TasksTransaction {
     }
     const [row] = await this.tx.$queryRaw<OwnershipRow[]>`
       SELECT t.created_by_id, t.deleted_at IS NOT NULL AS is_deleted,
-        NOT (${TASK_LINKS_VISIBLE}) AS is_hidden
+        NOT ${taskLinksVisible(TASK)} AS is_hidden
       FROM tasks t
-      ${TASK_LINK_JOINS}
+      ${taskLinkJoins(TASK)}
       WHERE t.id = ${id}::uuid AND t.workspace_id = ${workspaceId}::uuid`;
     if (!row) {
       return null;
@@ -140,7 +150,7 @@ export class PrismaTasksTransaction implements TasksTransaction {
 
   async softDelete(workspaceId: string, id: string): Promise<boolean> {
     const { count } = await this.tx.task.updateMany({
-      where: { id, ...visible(workspaceId) },
+      where: { id, ...visibleTask(workspaceId) },
       data: { deletedAt: new Date() },
     });
     return count > 0;
@@ -148,9 +158,18 @@ export class PrismaTasksTransaction implements TasksTransaction {
 
   async restore(workspaceId: string, id: string): Promise<boolean> {
     const { count } = await this.tx.task.updateMany({
-      where: { id, ...deletedButLinksVisible(workspaceId) },
+      where: { id, ...deletedTaskWithVisibleLinks(workspaceId) },
       data: { deletedAt: null },
     });
     return count > 0;
+  }
+
+  async addActivity(
+    workspaceId: string,
+    taskId: string,
+    actorId: string,
+    event: TaskEvent,
+  ): Promise<void> {
+    await this.activityLog.record(this.tx, [{ workspaceId, actorId, subjectId: taskId, event }]);
   }
 }

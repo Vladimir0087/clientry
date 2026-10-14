@@ -79,6 +79,15 @@ describe('TasksService', () => {
       });
     });
 
+    it('should record task_created with the assignee snapshot of the created task when a task is created', async () => {
+      await service.create(MANAGER, INPUT);
+
+      expect(tx.addActivity).toHaveBeenCalledWith(WORKSPACE_ID, TASK.id, MANAGER.id, {
+        type: 'task_created',
+        payload: { assignee: TASK.assignee, dueAt: TASK.dueAt },
+      });
+    });
+
     it('should store no reminder and no link when both are left out', async () => {
       await service.create(OWNER, { title: 'Call', dueAt: TASK.dueAt, assigneeId: OWNER.id });
 
@@ -316,6 +325,31 @@ describe('TasksService', () => {
       await expect(service.complete(OWNER, TASK.id)).resolves.toEqual(done);
       expect(tx.update).not.toHaveBeenCalled();
       expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it('should record task_completed when an open task is completed', async () => {
+      await service.complete(MANAGER, TASK.id);
+
+      expect(tx.addActivity).toHaveBeenCalledWith(WORKSPACE_ID, TASK.id, MANAGER.id, {
+        type: 'task_completed',
+        payload: {},
+      });
+    });
+
+    it('should record nothing when a done task is completed again', async () => {
+      tx.findById.mockResolvedValue({ ...TASK, doneAt: '2026-10-13T08:00:00.000Z' });
+
+      await service.complete(OWNER, TASK.id);
+
+      expect(tx.addActivity).not.toHaveBeenCalled();
+    });
+
+    it('should record nothing when a done task is reopened', async () => {
+      tx.findById.mockResolvedValue({ ...TASK, doneAt: '2026-10-13T08:00:00.000Z' });
+
+      await service.reopen(OWNER, TASK.id);
+
+      expect(tx.addActivity).not.toHaveBeenCalled();
     });
 
     it('should clear doneAt and log when a done task is reopened', async () => {

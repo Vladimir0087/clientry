@@ -3,8 +3,10 @@ import 'server-only';
 import type { QueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 
+import { activityFeedPath, activityKeys } from '@/entities/activity';
 import { clientKeys, clientListPath } from '@/entities/client';
 import type { ClientFilters } from '@/entities/client';
+import { DASHBOARD_SUMMARY_PATH, dashboardKeys } from '@/entities/dashboard';
 import { boardPath, dealKeys, stageKeys } from '@/entities/deal';
 import type { BoardFilters } from '@/entities/deal';
 import { memberKeys } from '@/entities/member';
@@ -22,8 +24,10 @@ import type { CookieReader } from '@/shared/api/server-client';
 import { writeServerLog } from '@/shared/lib/server-log';
 import type { ServerLogFields } from '@/shared/lib/server-log';
 import type { AccessSession } from '@/shared/lib/verify-access-token';
+import { activityFeedResponseSchema } from '@clientry/shared/activity';
 import { sessionResponseSchema } from '@clientry/shared/auth';
 import { clientListResponseSchema, clientResponseSchema } from '@clientry/shared/clients';
+import { dashboardSummaryResponseSchema } from '@clientry/shared/dashboard';
 import {
   boardResponseSchema,
   dealHistoryResponseSchema,
@@ -266,6 +270,34 @@ export function prefetchUnreadCount(
       queryKey: notificationKeys.unreadCount,
       queryFn: ({ signal }) =>
         fetch('/api/notifications/unread-count', unreadCountResponseSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchDashboardSummary(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+): Promise<void> {
+  return prefetch(request, { label: 'Dashboard summary' }, (fetch) =>
+    queryClient.query({
+      queryKey: dashboardKeys.summary,
+      queryFn: ({ signal }) =>
+        fetch(DASHBOARD_SUMMARY_PATH, dashboardSummaryResponseSchema, signal),
+      retry: false,
+    }),
+  );
+}
+
+export function prefetchActivityFeed(
+  queryClient: QueryClient,
+  request: PrefetchRequest,
+): Promise<void> {
+  return prefetch(request, { label: 'Activity feed' }, (fetch) =>
+    queryClient.infiniteQuery({
+      queryKey: activityKeys.feed,
+      queryFn: ({ signal }) => fetch(activityFeedPath(null), activityFeedResponseSchema, signal),
+      initialPageParam: null,
       retry: false,
     }),
   );

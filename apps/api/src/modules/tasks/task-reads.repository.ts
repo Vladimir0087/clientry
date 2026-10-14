@@ -3,23 +3,12 @@ import type { Task, TaskRelated } from '@clientry/shared/tasks';
 import type { TaskCursor } from './task-cursor.js';
 import type { TaskListFilter } from './tasks.repository.js';
 import { Prisma } from '../../infra/prisma/generated/client.js';
+import { taskLinkJoins, taskLinksVisible } from '../../infra/prisma/visibility.js';
 
 // Raw SQL with joins rather than Prisma relation selects: Prisma loads sibling relations with
 // concurrent queries, which overlap on a transaction's one connection, and pg deprecates that.
 
-// Its client, or its deal and that deal's client, must not be deleted.
-const LINKS_VISIBLE: readonly Prisma.TaskWhereInput[] = [
-  { OR: [{ clientId: null }, { client: { is: { deletedAt: null } } }] },
-  { OR: [{ dealId: null }, { deal: { is: { deletedAt: null, client: { deletedAt: null } } } }] },
-];
-
-export function visible(workspaceId: string): Prisma.TaskWhereInput {
-  return { workspaceId, deletedAt: null, AND: [...LINKS_VISIBLE] };
-}
-
-export function deletedButLinksVisible(workspaceId: string): Prisma.TaskWhereInput {
-  return { workspaceId, deletedAt: { not: null }, AND: [...LINKS_VISIBLE] };
-}
+const TASK = { task: 't', client: 'c', deal: 'd', dealClient: 'dc' } as const;
 
 interface TaskRow {
   readonly id: string;
@@ -75,15 +64,6 @@ function toTask(row: TaskRow): Task {
   };
 }
 
-// The outer joins never hide a row; TASK_LINKS_VISIBLE drops a task whose linked rows are deleted.
-export const TASK_LINK_JOINS = Prisma.sql`
-  LEFT JOIN clients c ON c.id = t.client_id
-  LEFT JOIN deals d ON d.id = t.deal_id
-  LEFT JOIN clients dc ON dc.id = d.client_id`;
-
-export const TASK_LINKS_VISIBLE = Prisma.sql`(t.client_id IS NULL OR c.deleted_at IS NULL)
-  AND (t.deal_id IS NULL OR (d.deleted_at IS NULL AND dc.deleted_at IS NULL))`;
-
 async function selectTasks(
   db: Prisma.TransactionClient,
   workspaceId: string,
@@ -98,9 +78,9 @@ async function selectTasks(
     FROM tasks t
     JOIN users a ON a.id = t.assignee_id
     JOIN users cb ON cb.id = t.created_by_id
-    ${TASK_LINK_JOINS}
+    ${taskLinkJoins(TASK)}
     WHERE t.workspace_id = ${workspaceId}::uuid AND t.deleted_at IS NULL
-      AND ${TASK_LINKS_VISIBLE}
+      AND ${taskLinksVisible(TASK)}
       AND ${condition}
     ${suffix}`;
   return rows.map(toTask);

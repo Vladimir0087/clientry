@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 
+import { EMPTY_SUMMARY, makeClosedDeals } from '../dashboard';
 import { TEST_MEMBERS, TEST_STAGES } from '../deals';
 import { TEST_SESSION } from '../fixtures';
 
@@ -15,4 +16,8 @@ export const handlers = [
   http.get('*/api/members', () => HttpResponse.json(TEST_MEMBERS)),
   // The shell's bell asks for it on every page.
   http.get('*/api/notifications/unread-count', () => HttpResponse.json({ count: 0 })),
+  // The dashboard asks for all three on mount.
+  http.get('*/api/dashboard/summary', () => HttpResponse.json(EMPTY_SUMMARY)),
+  http.get('*/api/dashboard/closed-deals', () => HttpResponse.json(makeClosedDeals())),
+  http.get('*/api/activity', () => HttpResponse.json({ items: [], nextCursor: null })),
 ];

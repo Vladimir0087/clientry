@@ -56,7 +56,7 @@ packages/shared/
 docs/deployment.md                       # runbook
 docs/adr/0008-deployment.md
 docs/adr/0011-web-on-netlify.md
-docs/specs/14-deploy-stage-2.md          # the web stays on Netlify
+docs/specs/15-deploy-stage-2.md          # the web stays on Netlify
 ```
 
 **Runtime: Node 24 LTS**
@@ -265,7 +265,7 @@ Workflow `CI` runs on pull requests, on pushes to `main`, and by manual dispatch
   has nothing to build from.
 
 GitHub secrets and variables live at repo level: a private repo on the free plan has no
-environments. They move to a `production` environment once the repo is public (spec 13).
+environments. They move to a `production` environment once the repo is public (spec 14).
 
 | Name                               | Kind     | Value                                     |
 | ---------------------------------- | -------- | ----------------------------------------- |
@@ -416,7 +416,7 @@ Free plans, checked on 2026-10-06 (the web on 2026-10-11):
     the adapter's catch-all function would likely be matched before them;
   - the consequences: functions in Ohio, a 30 s limit on a proxied call, the plan that must not
     change, `TRUST_PROXY_HOPS` measured again, rollback that the next deploy overrides.
-- `docs/specs/14-deploy-stage-2.md`: the web stays on Netlify; `API_URL` changes there.
+- `docs/specs/15-deploy-stage-2.md`: the web stays on Netlify; `API_URL` changes there.
 
 ### Out of scope
 
@@ -427,8 +427,8 @@ Free plans, checked on 2026-10-06 (the web on 2026-10-11):
 - Separate database roles for migrations and the app; Neon's pooler and branches.
 - GHCR retention, image signing, SBOM, vulnerability scanning, Dockerfile linting.
 - Error tracking, log drains, downtime notifications; Netlify Analytics.
-- Demo data and "Log in as demo" (spec 11); e2e against the live host (spec 12); README and badges
-  (spec 13); the VPS (spec 14).
+- Demo data and "Log in as demo" (spec 12); e2e against the live host (spec 13); README and badges
+  (spec 14); the VPS (spec 15).
 - Moving back to Node 26.
 
 ## 3. Data model
@@ -508,7 +508,7 @@ No new screens. The screens of spec 04 now run on the live host:
     refresh, both succeed.
 - **Container**: `smoke-api-container.sh` in the `image` job, as in section 2.
 - **Live**: `wait-for-api-version.sh` and `smoke-live.sh` on every deploy, as in section 2.
-- **e2e**: none (spec 12). The live checks of section 7 are done by hand and with
+- **e2e**: none (spec 13). The live checks of section 7 are done by hand and with
   `browser-verify` against the live URL.
 - **Tooling checks**, done once on throwaway changes that are not committed; each must fail:
   - a migration with invalid SQL: `pnpm infra:full` fails, the `api` container exits non-zero and
@@ -571,5 +571,5 @@ No new screens. The screens of spec 04 now run on the live host:
       `package.json`.
 - [ ] Every tooling check from section 6 fails as described.
 - [ ] `docs/deployment.md`, ADR 0008 and ADR 0011 are written; ADR 0008's status points to 0011;
-      spec 14 names Netlify; no `vercel` is left in code, CI or the runbook.
+      spec 15 names Netlify; no `vercel` is left in code, CI or the runbook.
 - [ ] This spec is part of the PR.

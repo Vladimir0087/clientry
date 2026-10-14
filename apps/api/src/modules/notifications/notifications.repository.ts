@@ -1,6 +1,6 @@
 import type { Notification } from '@clientry/shared/notifications';
 
-import type { NotificationCursor } from './notification-cursor.js';
+import type { CreatedAtCursor } from '../../common/pagination/created-at-cursor.js';
 
 // Every method reads or writes only the notifications of one user in one workspace.
 export interface NotificationOwner {
@@ -9,7 +9,7 @@ export interface NotificationOwner {
 }
 
 export interface NotificationPageRequest {
-  readonly after: NotificationCursor | null;
+  readonly after: CreatedAtCursor | null;
   readonly limit: number;
 }
 

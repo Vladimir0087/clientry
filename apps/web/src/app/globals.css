@@ -99,6 +99,9 @@
   --success-foreground: oklch(0.42 0.11 155);
   --danger: oklch(0.95 0.035 25);
   --danger-foreground: oklch(0.48 0.17 25);
+  /* Bars against the page background: 4.9:1 and 4.6:1, above the 3:1 that WCAG 1.4.11 asks. */
+  --chart-1: oklch(0.55 0.16 255);
+  --chart-2: oklch(0.55 0.13 155);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -124,6 +127,9 @@
   --success-foreground: oklch(0.86 0.12 155);
   --danger: oklch(0.3 0.08 25);
   --danger-foreground: oklch(0.86 0.09 25);
+  /* 8:1 and 9.8:1 against the dark page background. */
+  --chart-1: oklch(0.72 0.13 250);
+  --chart-2: oklch(0.76 0.14 155);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);

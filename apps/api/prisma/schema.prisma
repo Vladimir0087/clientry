@@ -49,6 +49,9 @@ enum ActivityType {
   deal_updated
   deal_deleted
   deal_restored
+  client_created
+  task_created
+  task_completed
 
   @@map("activity_type")
 }
@@ -192,6 +195,7 @@ model Client {
   createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
   deals       Deal[]
   tasks       Task[]
+  activities  Activity[]
 
   @@index([workspaceId, createdAt, id])
   @@index([workspaceId, name, id])
@@ -239,16 +243,22 @@ model Deal {
 model Activity {
   id          String       @id @default(uuid(7)) @db.Uuid
   workspaceId String       @map("workspace_id") @db.Uuid
-  dealId      String       @map("deal_id") @db.Uuid
+  // Exactly one subject is set, fixed by the type; ActivityLog is the one writer and the only gate.
+  dealId      String?      @map("deal_id") @db.Uuid
+  clientId    String?      @map("client_id") @db.Uuid
+  taskId      String?      @map("task_id") @db.Uuid
   actorId     String       @map("actor_id") @db.Uuid
   type        ActivityType
   payload     Json
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  deal        Deal         @relation(fields: [dealId], references: [id], onDelete: NoAction)
+  deal        Deal?        @relation(fields: [dealId], references: [id], onDelete: NoAction)
+  client      Client?      @relation(fields: [clientId], references: [id], onDelete: NoAction)
+  task        Task?        @relation(fields: [taskId], references: [id], onDelete: NoAction)
   actor       User         @relation(fields: [actorId], references: [id], onDelete: Restrict)
 
   @@index([dealId, createdAt, id])
+  @@index([workspaceId, createdAt, id])
   @@map("activities")
 }
 
@@ -274,6 +284,7 @@ model Task {
   client         Client?        @relation(fields: [clientId], references: [id], onDelete: NoAction)
   deal           Deal?          @relation(fields: [dealId], references: [id], onDelete: NoAction)
   notifications  Notification[]
+  activities     Activity[]
 
   // Open lists read done_at IS NULL forwards, done lists read the same index backwards.
   @@index([workspaceId, doneAt, dueAt, id])

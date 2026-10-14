@@ -4,8 +4,10 @@ import { PrismaRemindersTransaction } from './prisma-reminders-transaction.repos
 import type { PendingReminder } from './reminder-queue.js';
 import type { ReminderWindow } from './reminder-window.js';
 import type { RemindersRepository, RemindersTransaction } from './reminders.repository.js';
-import { TASK_LINK_JOINS, TASK_LINKS_VISIBLE } from './task-reads.repository.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
+import { taskLinkJoins, taskLinksVisible } from '../../infra/prisma/visibility.js';
+
+const TASK = { task: 't', client: 'c', deal: 'd', dealClient: 'dc' } as const;
 
 interface PendingRow {
   readonly workspace_id: string;
@@ -22,10 +24,10 @@ export class PrismaRemindersRepository implements RemindersRepository {
     const rows = await this.prisma.$queryRaw<PendingRow[]>`
       SELECT t.workspace_id, t.id AS task_id, t.remind_at
       FROM tasks t
-      ${TASK_LINK_JOINS}
+      ${taskLinkJoins(TASK)}
       WHERE t.remind_at >= ${from} AND t.remind_at <= ${to}
         AND t.reminder_sent_at IS NULL AND t.done_at IS NULL AND t.deleted_at IS NULL
-        AND ${TASK_LINKS_VISIBLE}`;
+        AND ${taskLinksVisible(TASK)}`;
     return rows.map((row) => ({
       workspaceId: row.workspace_id,
       taskId: row.task_id,

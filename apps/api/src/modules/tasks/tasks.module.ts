@@ -15,9 +15,10 @@ import { TasksRepository } from './tasks.repository.js';
 import { TasksService } from './tasks.service.js';
 import { PrismaModule } from '../../infra/prisma/prisma.module.js';
 import { QueueFactory } from '../../infra/queue/queue-factory.js';
+import { ActivityModule } from '../activity/activity.module.js';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, ActivityModule],
   controllers: [TasksController],
   providers: [
     TasksService,

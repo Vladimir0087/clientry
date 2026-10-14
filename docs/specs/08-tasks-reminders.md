@@ -565,7 +565,7 @@ A malformed `:id` answers 400 `VALIDATION_FAILED` on `id` before any query, as i
 - Task events in a deal's history or the activity feed (spec 10 decides).
 - Filters by member (spec 09), by client or deal in the task list, search and other sorts, bulk
   actions, a calendar view.
-- A notifications page, deleting notifications, a purge of old ones (the demo reset of spec 11
+- A notifications page, deleting notifications, a purge of old ones (the demo reset of spec 12
   clears them).
 - Record versions for tasks; hard delete and a purge of deleted tasks.
 - A queue dashboard (Bull Board); metrics.
@@ -897,7 +897,7 @@ scroll of the page, and by keyboard only.
   - Main nav: `aria-current` on `/tasks` and `/tasks/<id>`.
   - The default MSW handlers gain `GET /api/notifications/unread-count` with `{ count: 0 }`: the
     shell requests it on every page.
-- **e2e**: none (spec 12).
+- **e2e**: none (spec 13).
 - **Tooling checks**, done once on throwaway changes that are not committed; each must fail:
   - `entities/task` importing `@/entities/client` (lint);
   - `features/task-form` importing `@/features/deal-form` (lint).
@@ -946,7 +946,7 @@ scroll of the page, and by keyboard only.
       bell; `browser-verify` against the live URL over the screens of section 5 passes.
 - [ ] A day after the deploy: Render's memory graph for the API stays under 450 MB, and Neon's
       monitoring shows compute suspended between the hourly sweeps while nobody uses the demo. If
-      either fails, the owner decides on spec 14 (plan section 12).
+      either fails, the owner decides on spec 15 (plan section 12).
 - [ ] `docs/deployment.md` names the queue connections, the Neon and Netlify budgets of section 2
       and the memory check; ADR 0012 is written.
 - [ ] A week after the deploy, Netlify's usage page shows function invocations on pace to stay well

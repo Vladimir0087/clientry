@@ -10,13 +10,12 @@ import type {
 
 import type { BoardFilter } from './deals.repository.js';
 import { Prisma } from '../../infra/prisma/generated/client.js';
+import { dealClientJoin, dealVisible } from '../../infra/prisma/visibility.js';
 
 // Raw SQL with joins rather than Prisma relation selects: Prisma loads sibling relations with
 // concurrent queries, which overlap on a transaction's one connection, and pg deprecates that.
 
-export function visible(workspaceId: string): Prisma.DealWhereInput {
-  return { workspaceId, deletedAt: null, client: { deletedAt: null } };
-}
+const DEAL = { deal: 'd', client: 'c' } as const;
 
 interface DealRow {
   readonly id: string;
@@ -69,10 +68,10 @@ export async function selectDeals(
       cb.id AS created_by_id, cb.name AS created_by_name
     FROM deals d
     JOIN stages s ON s.id = d.stage_id
-    JOIN clients c ON c.id = d.client_id AND c.deleted_at IS NULL
+    ${dealClientJoin(DEAL)}
     JOIN users a ON a.id = d.assignee_id
     JOIN users cb ON cb.id = d.created_by_id
-    WHERE d.workspace_id = ${workspaceId}::uuid AND d.deleted_at IS NULL AND ${condition}
+    WHERE d.workspace_id = ${workspaceId}::uuid AND ${dealVisible(DEAL)} AND ${condition}
     ${order}`;
   return rows.map(toDeal);
 }
@@ -150,10 +149,10 @@ function columnCards(
       c.id AS client_id, c.name AS client_name, u.id AS assignee_id, u.name AS assignee_name,
       row_number() OVER (ORDER BY ${order}) AS card_rank
     FROM deals d
-    JOIN clients c ON c.id = d.client_id AND c.deleted_at IS NULL
+    ${dealClientJoin(DEAL)}
     JOIN users u ON u.id = d.assignee_id
     WHERE ${kind} AND d.workspace_id = ${workspaceId}::uuid AND d.stage_id = s.id
-      AND d.deleted_at IS NULL ${assignee}
+      AND ${dealVisible(DEAL)} ${assignee}
     ORDER BY ${order}
     LIMIT ${DEAL_LIMITS.boardColumn}`;
 }

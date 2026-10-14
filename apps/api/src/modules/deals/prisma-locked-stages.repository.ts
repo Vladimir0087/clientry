@@ -1,9 +1,9 @@
-import { dealEventSchema } from '@clientry/shared/deals';
 import type { Stage, StageListItem } from '@clientry/shared/deals';
 
-import { visible } from './deal-reads.repository.js';
 import type { DealMovedEvent, DealTransfer, LockedStagesRepository } from './stages.repository.js';
 import type { Prisma } from '../../infra/prisma/generated/client.js';
+import { visibleDeal } from '../../infra/prisma/visibility.js';
+import type { ActivityLog } from '../activity/activity-log.repository.js';
 
 const STAGE_SELECT = { id: true, name: true, kind: true } satisfies Prisma.StageSelect;
 
@@ -22,14 +22,17 @@ export async function listWithCounts(
     select: {
       ...STAGE_SELECT,
       // workspaceId too: the count runs as one GROUP BY over deals, which the join does not narrow.
-      _count: { select: { deals: { where: visible(workspaceId) } } },
+      _count: { select: { deals: { where: visibleDeal(workspaceId) } } },
     },
   });
   return rows.map(({ _count, ...stage }) => ({ ...stage, dealCount: _count.deals }));
 }
 
 export class PrismaLockedStagesRepository implements LockedStagesRepository {
-  constructor(private readonly tx: Prisma.TransactionClient) {}
+  constructor(
+    private readonly tx: Prisma.TransactionClient,
+    private readonly activityLog: ActivityLog,
+  ) {}
 
   list(workspaceId: string): Promise<Stage[]> {
     return this.tx.stage.findMany({
@@ -106,7 +109,6 @@ export class PrismaLockedStagesRepository implements LockedStagesRepository {
     if (transfers.length === 0) {
       return;
     }
-    const { type, payload } = dealEventSchema.parse(event);
     const ids = transfers.map(({ id }) => id);
     const positions = transfers.map(({ position }) => position);
     await this.tx.$executeRaw`
@@ -115,9 +117,10 @@ export class PrismaLockedStagesRepository implements LockedStagesRepository {
         updated_at = now()
       FROM unnest(${ids}::uuid[], ${positions}::text[]) AS t(id, position)
       WHERE d.id = t.id AND d.workspace_id = ${workspaceId}::uuid`;
-    await this.tx.activity.createMany({
-      data: ids.map((dealId) => ({ workspaceId, dealId, actorId, type, payload })),
-    });
+    await this.activityLog.record(
+      this.tx,
+      ids.map((subjectId) => ({ workspaceId, actorId, subjectId, event })),
+    );
   }
 
   async delete(workspaceId: string, id: string): Promise<void> {

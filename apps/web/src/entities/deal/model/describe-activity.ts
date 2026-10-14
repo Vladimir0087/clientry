@@ -1,6 +1,5 @@
+import { formatMoney } from '@/shared/lib/money';
 import type { DealActivity, DealChange } from '@clientry/shared/deals';
-
-import { formatMoney } from './money';
 
 function describeChange(actor: string, change: DealChange): string {
   switch (change.field) {

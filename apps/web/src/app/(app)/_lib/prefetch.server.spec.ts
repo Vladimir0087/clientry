@@ -3,7 +3,9 @@ import { delay, http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
 
+import { activityKeys } from '@/entities/activity';
 import { clientKeys, normalizeClientFilters } from '@/entities/client';
+import { dashboardKeys } from '@/entities/dashboard';
 import { dealKeys, stageKeys } from '@/entities/deal';
 import { memberKeys } from '@/entities/member';
 import { notificationKeys } from '@/entities/notification';
@@ -18,10 +20,12 @@ import { verifyAccessToken } from '@/shared/lib/verify-access-token';
 import { ACCESS_TOKEN_COOKIE } from '@clientry/shared/auth';
 
 import {
+  prefetchActivityFeed,
   prefetchBoard,
   prefetchClient,
   prefetchClientDeals,
   prefetchClientList,
+  prefetchDashboardSummary,
   prefetchDeal,
   prefetchDealHistory,
   prefetchFilterMembers,
@@ -34,7 +38,9 @@ import {
 } from './prefetch';
 import type { PrefetchRequest } from './prefetch';
 import { taskSectionFilters } from './task-section-filters';
+import { makeActivityEntry, makeActivityPage } from '../../../../test/activity';
 import { TEST_CLIENT, TEST_CLIENT_LIST } from '../../../../test/clients';
+import { makeSummary } from '../../../../test/dashboard';
 import { makeBoard, TEST_DEAL, TEST_MEMBERS, TEST_STAGES } from '../../../../test/deals';
 import { TEST_SESSION } from '../../../../test/fixtures';
 import { problemResponse } from '../../../../test/msw/problem';
@@ -470,6 +476,49 @@ describe('prefetch', () => {
 
       expect(counter.count).toBe(1);
       expect(writtenLines()).toEqual([]);
+    });
+  });
+
+  describe('dashboard', () => {
+    it('should fill the summary key and the first feed page key the hooks read when the API answers', async () => {
+      const summary = makeSummary();
+      const page = makeActivityPage([makeActivityEntry(1)], 'next');
+      countRequests('/api/dashboard/summary', () => HttpResponse.json(summary));
+      countRequests('/api/activity', () => HttpResponse.json(page));
+      const closedDeals = countRequests('/api/dashboard/closed-deals', () => HttpResponse.json({}));
+      const queryClient = createQueryClient();
+      const request = await requestWith(await createAccessToken());
+
+      await Promise.all([
+        prefetchDashboardSummary(queryClient, request),
+        prefetchActivityFeed(queryClient, request),
+      ]);
+
+      expect(queryClient.getQueryData(dashboardKeys.summary)).toEqual(summary);
+      expect(queryClient.getQueryData(activityKeys.feed)).toEqual({
+        pages: [page],
+        pageParams: [null],
+      });
+      expect(closedDeals.count).toBe(0);
+      expect(writtenLines()).toEqual([]);
+    });
+
+    it('should write one warn line when the summary fails', async () => {
+      countRequests('/api/dashboard/summary', () => problemResponse(500, 'INTERNAL_ERROR'));
+
+      await prefetchDashboardSummary(
+        createQueryClient(),
+        await requestWith(await createAccessToken()),
+      );
+
+      const lines = writtenLines();
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0] ?? '')).toMatchObject({
+        level: 40,
+        msg: 'Dashboard summary prefetch failed',
+        reason: 'http',
+        status: 500,
+      });
     });
   });
 });

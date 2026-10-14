@@ -10,22 +10,25 @@ import type {
 } from '@clientry/shared/notifications';
 
 import { NotificationNotFoundError } from './errors.js';
-import { decodeNotificationCursor, encodeNotificationCursor } from './notification-cursor.js';
-import type { NotificationCursor } from './notification-cursor.js';
 import { NotificationsRepository } from './notifications.repository.js';
 import type { NotificationOwner } from './notifications.repository.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
 import { RequestValidationError } from '../../common/errors/request-validation.error.js';
+import {
+  decodeCreatedAtCursor,
+  encodeCreatedAtCursor,
+} from '../../common/pagination/created-at-cursor.js';
+import type { CreatedAtCursor } from '../../common/pagination/created-at-cursor.js';
 
 function ownerOf(user: AuthUser): NotificationOwner {
   return { workspaceId: user.workspaceId, userId: user.id };
 }
 
-function decodeCursor(raw: string | undefined): NotificationCursor | null {
+function decodeCursor(raw: string | undefined): CreatedAtCursor | null {
   if (raw === undefined) {
     return null;
   }
-  const cursor = decodeNotificationCursor(raw);
+  const cursor = decodeCreatedAtCursor(raw);
   if (!cursor) {
     throw new RequestValidationError([{ path: 'cursor', message: 'Invalid cursor' }]);
   }
@@ -33,7 +36,7 @@ function decodeCursor(raw: string | undefined): NotificationCursor | null {
 }
 
 function cursorAfter({ createdAt, id }: Notification): string {
-  return encodeNotificationCursor({ createdAt, id });
+  return encodeCreatedAtCursor({ createdAt, id });
 }
 
 // Reminder delivery in the tasks module writes notifications; this module reads and marks them.

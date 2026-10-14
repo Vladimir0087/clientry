@@ -323,7 +323,7 @@ refreshes would trip reuse detection.
 - Hosting variables, `TRUST_PROXY_HOPS` on Render, cookies through the Vercel proxy (spec 05).
 - Stage management, deals and the board (spec 07).
 - Invites, registration through an invite, member removal, role change (spec 09).
-- Demo login (spec 11).
+- Demo login (spec 12).
 - Password change and reset, email verification, account and workspace deletion, a list of active
   sessions, logout everywhere.
 - `Authorization: Bearer`, WebSocket tickets (v2).
@@ -333,7 +333,7 @@ refreshes would trip reuse detection.
 - A periodic purge of sessions past their absolute end: login cleans up only the user who logs in,
   so users who never return leave their expired rows. A repeatable job comes with the first queue
   in spec 08.
-- A switch that relaxes rate limits outside production for e2e runs from one IP (spec 12 decides).
+- A switch that relaxes rate limits outside production for e2e runs from one IP (spec 13 decides).
 - Checking passwords against a list of common ones.
 - The client's reaction to responses: only a 401 from refresh means logged out, a 429 does not
   (spec 04).
@@ -498,7 +498,7 @@ None. Login and registration pages come in spec 04; Swagger UI covers manual che
   - OpenAPI document: the five auth operations; `/api/auth/me` with the cookie security scheme,
     the other four with `security: []`; their error responses reference `ApiProblem`.
   - Migrations: deploy and the drift check in global setup pass with the new tables.
-- **e2e**: none (spec 12).
+- **e2e**: none (spec 13).
 
 ## 7. Acceptance criteria
 

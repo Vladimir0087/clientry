@@ -24,6 +24,12 @@ const SHARED_BY_FILE = {
   message: 'Import shared file by file, e.g. @/shared/ui/button.',
 };
 
+// Only the dashboard page imports this slice, so other routes never load the library.
+const RECHARTS_IN_CHARTS_ONLY = {
+  group: ['recharts', 'recharts/*'],
+  message: 'Only features/dashboard-charts imports recharts.',
+};
+
 const ELEMENTS = [
   { type: 'app', pattern: 'src/app' },
   { type: 'features', pattern: 'src/features/*', capture: ['slice'] },
@@ -125,16 +131,29 @@ export default function next(rootDir) {
           'error',
           { checksVoidReturn: { attributes: false } },
         ],
-        ...restrictedImports([SHARED_BY_FILE]),
+        ...restrictedImports([SHARED_BY_FILE, RECHARTS_IN_CHARTS_ONLY]),
       },
     },
+    // A later no-restricted-imports replaces the earlier options, so each block lists them all.
     {
       files: ['src/features/**/*.{ts,tsx}'],
+      rules: restrictedImports([
+        SHARED_BY_FILE,
+        RECHARTS_IN_CHARTS_ONLY,
+        ...ownPublicApi('features'),
+      ]),
+    },
+    {
+      files: ['src/features/dashboard-charts/**/*.{ts,tsx}'],
       rules: restrictedImports([SHARED_BY_FILE, ...ownPublicApi('features')]),
     },
     {
       files: ['src/entities/**/*.{ts,tsx}'],
-      rules: restrictedImports([SHARED_BY_FILE, ...ownPublicApi('entities')]),
+      rules: restrictedImports([
+        SHARED_BY_FILE,
+        RECHARTS_IN_CHARTS_ONLY,
+        ...ownPublicApi('entities'),
+      ]),
     },
     {
       files: LAYERED_FILES,

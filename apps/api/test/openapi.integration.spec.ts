@@ -443,6 +443,81 @@ describe('OpenAPI document', () => {
     );
   });
 
+  describe('dashboard and activity operations', () => {
+    const OPERATIONS = [
+      ['get', '/api/dashboard/summary', 'dashboard'],
+      ['get', '/api/dashboard/closed-deals', 'dashboard'],
+      ['get', '/api/activity', 'activity'],
+    ] as const;
+
+    interface Parameter {
+      readonly name: string;
+      readonly in: string;
+      readonly schema?: { readonly type?: string };
+    }
+
+    interface Operation {
+      readonly tags?: readonly string[];
+      readonly security?: unknown;
+      readonly parameters?: readonly Parameter[];
+      readonly responses?: Record<string, { content?: Record<string, { schema?: unknown }> }>;
+    }
+
+    function operation(method: string, path: string): Operation | undefined {
+      const paths = document.paths as Record<string, Record<string, Operation> | undefined>;
+      return paths[path]?.[method];
+    }
+
+    function queryParameters(op: Operation | undefined): Parameter[] {
+      return (op?.parameters ?? []).filter((parameter) => parameter.in === 'query');
+    }
+
+    it('should document three operations under dashboard and activity when the document is built', () => {
+      const paths = Object.entries(document.paths as Record<string, Record<string, unknown>>)
+        .filter(([path]) => /^\/api\/(dashboard|activity)/.test(path))
+        .flatMap(([path, item]) => Object.keys(item).map((method) => `${method} ${path}`));
+
+      expect(paths.toSorted()).toEqual(
+        OPERATIONS.map(([method, path]) => `${method} ${path}`).toSorted(),
+      );
+    });
+
+    it.each(OPERATIONS)(
+      'should tag, require the access cookie and document 401 when %s %s is documented',
+      (method, path, tag) => {
+        const op = operation(method, path);
+
+        expect(op?.tags).toEqual([tag]);
+        expect(op?.security).toEqual([{ accessCookie: [] }]);
+        expect(op?.responses?.['401']?.content?.['application/problem+json']?.schema).toEqual(
+          PROBLEM_REF,
+        );
+      },
+    );
+
+    it('should list bounds as an array query parameter when closed deals are documented', () => {
+      const parameters = queryParameters(operation('get', '/api/dashboard/closed-deals'));
+
+      expect(parameters.map(({ name, schema }) => [name, schema?.type])).toEqual([
+        ['bounds', 'array'],
+      ]);
+    });
+
+    it('should list the cursor and the limit as query parameters when the feed is documented', () => {
+      expect(queryParameters(operation('get', '/api/activity')).map(({ name }) => name)).toEqual([
+        'cursor',
+        'limit',
+      ]);
+    });
+
+    it.each(['/api/dashboard/closed-deals', '/api/activity'])(
+      'should document a 400 example when get %s is documented',
+      (path) => {
+        expect(operation('get', path)?.responses?.['400']).toBeDefined();
+      },
+    );
+  });
+
   describe('team operations', () => {
     const JOIN_OPERATIONS = [
       ['post', '/api/auth/invite/preview', 'auth'],

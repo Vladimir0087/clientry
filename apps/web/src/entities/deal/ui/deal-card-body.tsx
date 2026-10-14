@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import type * as React from 'react';
 
+import { formatMoney } from '@/shared/lib/money';
 import { LocalDate } from '@/shared/ui/local-date';
 import type { DealCard } from '@clientry/shared/deals';
 
 import { dealPath } from '../model/deal-path';
-import { formatMoney } from '../model/money';
 
 interface DealCardBodyProps {
   readonly deal: DealCard;

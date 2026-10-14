@@ -4,8 +4,8 @@ const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
 const cursorTupleSchema = z.tuple([z.iso.datetime(), z.uuid()]);
 
-// The last entry of a page: lists run newest first by created_at, then id.
-export interface NotificationCursor {
+// The last row of a page in a list that runs newest first by created_at, then id.
+export interface CreatedAtCursor {
   readonly createdAt: string;
   readonly id: string;
 }
@@ -21,12 +21,12 @@ function parseJson(text: string): unknown {
   }
 }
 
-export function encodeNotificationCursor({ createdAt, id }: NotificationCursor): string {
+export function encodeCreatedAtCursor({ createdAt, id }: CreatedAtCursor): string {
   return Buffer.from(JSON.stringify([createdAt, id])).toString('base64url');
 }
 
 // Null for anything a list did not produce; Buffer alone would skip invalid characters.
-export function decodeNotificationCursor(raw: string): NotificationCursor | null {
+export function decodeCreatedAtCursor(raw: string): CreatedAtCursor | null {
   if (!BASE64URL.test(raw)) {
     return null;
   }
