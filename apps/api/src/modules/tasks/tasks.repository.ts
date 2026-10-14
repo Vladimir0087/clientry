@@ -1,3 +1,4 @@
+import type { ActivityEvent } from '@clientry/shared/activity';
 import type { Task, TaskRef, TaskRelatedRequest, TaskStatus } from '@clientry/shared/tasks';
 
 import type { TaskCursor } from './task-cursor.js';
@@ -36,6 +37,8 @@ export interface TaskPageRequest {
   readonly limit: number;
 }
 
+export type TaskEvent = Extract<ActivityEvent, { type: 'task_created' | 'task_completed' }>;
+
 export interface TaskPage {
   readonly items: readonly Task[];
   readonly hasMore: boolean;
@@ -58,6 +61,12 @@ export interface TasksTransaction {
   softDelete(workspaceId: string, id: string): Promise<boolean>;
   // False when the task was not deleted or is hidden.
   restore(workspaceId: string, id: string): Promise<boolean>;
+  addActivity(
+    workspaceId: string,
+    taskId: string,
+    actorId: string,
+    event: TaskEvent,
+  ): Promise<void>;
 }
 
 export abstract class TasksRepository {

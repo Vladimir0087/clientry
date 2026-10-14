@@ -10,6 +10,8 @@ const SERVER_ERROR = 500;
 
 export interface QueryClientOptions {
   readonly onSessionExpired?: () => void;
+  // Runs after every successful mutation, whichever feature made it.
+  readonly onMutationSuccess?: (queryClient: QueryClient) => void;
 }
 
 // Only failures that a sleeping or restarting API produces are worth another attempt.
@@ -19,7 +21,10 @@ function shouldRetry(failureCount: number, error: unknown): boolean {
   return isTransient && failureCount < MAX_RETRIES;
 }
 
-export function createQueryClient({ onSessionExpired }: QueryClientOptions = {}): QueryClient {
+export function createQueryClient({
+  onSessionExpired,
+  onMutationSuccess,
+}: QueryClientOptions = {}): QueryClient {
   let hasSessionExpired = false;
   const handleError = (error: unknown): void => {
     if (!(error instanceof SessionExpiredError) || hasSessionExpired) {
@@ -28,9 +33,14 @@ export function createQueryClient({ onSessionExpired }: QueryClientOptions = {})
     hasSessionExpired = true;
     onSessionExpired?.();
   };
-  return new QueryClient({
+  const queryClient: QueryClient = new QueryClient({
     queryCache: new QueryCache({ onError: handleError }),
-    mutationCache: new MutationCache({ onError: handleError }),
+    mutationCache: new MutationCache({
+      onError: handleError,
+      onSuccess: () => {
+        onMutationSuccess?.(queryClient);
+      },
+    }),
     defaultOptions: {
       // Offline, a paused request would leave a skeleton or a spinner; a failed one shows its error.
       queries: {
@@ -43,4 +53,5 @@ export function createQueryClient({ onSessionExpired }: QueryClientOptions = {})
       mutations: { retry: false, networkMode: 'always' },
     },
   });
+  return queryClient;
 }

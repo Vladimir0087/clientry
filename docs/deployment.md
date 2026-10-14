@@ -353,4 +353,4 @@ without input. The count the layout prefetches goes to the API directly and cost
 **Memory check.** A day after a deploy that changes the workers, Render's memory graph for the API
 should stay under 450 MB of the 512 MB, and Neon's monitoring should show compute suspended between
 the hourly sweeps while nobody uses the demo. If either fails, moving to a server of our own
-(spec 14) is back on the table.
+(spec 15) is back on the table.

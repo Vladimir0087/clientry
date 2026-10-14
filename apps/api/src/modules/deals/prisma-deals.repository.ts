@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { CURRENCIES, dealActivitySchema } from '@clientry/shared/deals';
 import type { BoardColumn, CurrencyTotal, Deal, DealActivity } from '@clientry/shared/deals';
 
-import { findDeal, loadBoardColumns, selectDeals, visible } from './deal-reads.repository.js';
+import { findDeal, loadBoardColumns, selectDeals } from './deal-reads.repository.js';
 import type {
   BoardFilter,
   DealPage,
@@ -13,6 +13,8 @@ import type {
 import { PrismaDealsTransaction } from './prisma-deals-transaction.repository.js';
 import { Prisma } from '../../infra/prisma/generated/client.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
+import { visibleDeal } from '../../infra/prisma/visibility.js';
+import { ActivityLog } from '../activity/activity-log.repository.js';
 
 const ACTIVITY_SELECT = {
   id: true,
@@ -45,7 +47,10 @@ function sortTotals(totals: CurrencyTotal[]): CurrencyTotal[] {
 
 @Injectable()
 export class PrismaDealsRepository implements DealsRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityLog: ActivityLog,
+  ) {}
 
   findById(workspaceId: string, id: string): Promise<Deal | null> {
     return findDeal(this.prisma, workspaceId, id);
@@ -53,7 +58,7 @@ export class PrismaDealsRepository implements DealsRepository {
 
   async isVisible(workspaceId: string, id: string): Promise<boolean> {
     const row = await this.prisma.deal.findFirst({
-      where: { id, ...visible(workspaceId) },
+      where: { id, ...visibleDeal(workspaceId) },
       select: { id: true },
     });
     return row !== null;
@@ -65,7 +70,7 @@ export class PrismaDealsRepository implements DealsRepository {
       loadBoardColumns(this.prisma, workspaceId, filter),
       this.prisma.deal.groupBy({
         by: ['stageId', 'currency'],
-        where: { ...visible(workspaceId), assigneeId: filter.assigneeId },
+        where: { ...visibleDeal(workspaceId), assigneeId: filter.assigneeId },
         _count: { _all: true },
         _sum: { amount: true },
       }),
@@ -115,6 +120,6 @@ export class PrismaDealsRepository implements DealsRepository {
   }
 
   inTransaction<T>(work: (deals: DealsTransaction) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction((tx) => work(new PrismaDealsTransaction(tx)));
+    return this.prisma.$transaction((tx) => work(new PrismaDealsTransaction(tx, this.activityLog)));
   }
 }

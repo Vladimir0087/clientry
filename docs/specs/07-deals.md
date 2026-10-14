@@ -566,7 +566,7 @@ validated as one object, as in spec 06.
 - Currency conversion, a workspace default currency, currencies with other exponents.
 - Live board updates (v2 WebSocket); until then the board refetches on focus and after own writes.
 - Client events in the history and the workspace activity feed (spec 10).
-- Tasks on deals (spec 08), member management and filters by member (spec 09), demo deals (spec 11).
+- Tasks on deals (spec 08), member management and filters by member (spec 09), demo deals (spec 12).
 - Hard delete and a purge of deleted deals; an unsaved-changes prompt.
 - Indexes on `assignee_id`, `created_by_id` and `actor_id`: users are never deleted, and "Only
   mine" walks a column through the stage index and filters, which stays cheap at a few hundred
@@ -992,7 +992,7 @@ scroll of the page, and by keyboard only.
     fields; a failed pointer drag leaves focus alone when the card did not have it and returns it
     without scrolling when it did; the keyboard coordinates keep Up and Down in the card's column.
   - Dragging across columns is not tested in jsdom, which has no layout for dnd-kit to measure; the
-    browser check covers it, and spec 12 adds e2e.
+    browser check covers it, and spec 13 adds e2e.
   - Deal page: the stage select sends a move and the details follow, shows its stage when the
     cached list lacks it, and a 409 shows the deal page's toast; every history line of section 5;
     the not found state on 404.
@@ -1019,7 +1019,7 @@ scroll of the page, and by keyboard only.
   - The default MSW handlers gain `GET /api/stages` with the six default stages and
     `GET /api/members` with the session user: the deal forms, the deal page's stage select and the
     stages page request one or both on mount, and unhandled requests fail tests.
-- **e2e**: none (spec 12).
+- **e2e**: none (spec 13).
 - **Tooling checks**, done once on throwaway changes that are not committed; each must fail:
   - `features/move-deal` importing `@/features/deal-form` (lint);
   - `entities/deal` importing `@/entities/client` (lint);

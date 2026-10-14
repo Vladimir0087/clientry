@@ -10,6 +10,7 @@ import { createQueryClient } from '@/shared/api/query-client';
 import { Toaster } from '@/shared/ui/sonner';
 
 import { handleSessionExpired } from './handle-session-expired';
+import { markDashboardStale } from './mark-dashboard-stale';
 
 let browserQueryClient: QueryClient | undefined;
 
@@ -22,6 +23,7 @@ function getQueryClient(): QueryClient {
     onSessionExpired: () => {
       void handleSessionExpired();
     },
+    onMutationSuccess: markDashboardStale,
   });
   return browserQueryClient;
 }

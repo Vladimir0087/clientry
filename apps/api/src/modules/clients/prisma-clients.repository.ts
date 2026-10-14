@@ -15,6 +15,7 @@ import type {
 import { escapeLikePattern } from './like-pattern.js';
 import { Prisma } from '../../infra/prisma/generated/client.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
+import { ActivityLog } from '../activity/activity-log.repository.js';
 
 const SUMMARY_SELECT = {
   id: true,
@@ -123,14 +124,28 @@ function filterWhere(filter: ClientListFilter): Prisma.ClientWhereInput[] {
 
 @Injectable()
 export class PrismaClientsRepository implements ClientsRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityLog: ActivityLog,
+  ) {}
 
-  async create(workspaceId: string, createdById: string, client: NewClient): Promise<Client> {
-    const row = await this.prisma.client.create({
-      data: { ...client, tags: [...client.tags], workspaceId, createdById },
-      select: CLIENT_SELECT,
+  // The client and its feed entry commit together.
+  create(workspaceId: string, createdById: string, client: NewClient): Promise<Client> {
+    return this.prisma.$transaction(async (tx) => {
+      const row = await tx.client.create({
+        data: { ...client, tags: [...client.tags], workspaceId, createdById },
+        select: CLIENT_SELECT,
+      });
+      await this.activityLog.record(tx, [
+        {
+          workspaceId,
+          actorId: createdById,
+          subjectId: row.id,
+          event: { type: 'client_created', payload: {} },
+        },
+      ]);
+      return toClient(row);
     });
-    return toClient(row);
   }
 
   async findById(workspaceId: string, id: string): Promise<Client | null> {

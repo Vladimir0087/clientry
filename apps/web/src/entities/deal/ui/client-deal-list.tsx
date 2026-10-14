@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import type * as React from 'react';
 
+import { formatMoney } from '@/shared/lib/money';
 import type { DealListResponse } from '@clientry/shared/deals';
 
 import { StageBadge } from './stage-badge';
 import { dealPath } from '../model/deal-path';
-import { formatMoney } from '../model/money';
 
 export function ClientDealList({ deals }: { readonly deals: DealListResponse }): React.JSX.Element {
   return (

@@ -6,10 +6,14 @@ import { listWithCounts, PrismaLockedStagesRepository } from './prisma-locked-st
 import type { LockedStagesRepository, StagesRepository } from './stages.repository.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
 import { lockWorkspace } from '../../infra/prisma/workspace-lock.js';
+import { ActivityLog } from '../activity/activity-log.repository.js';
 
 @Injectable()
 export class PrismaStagesRepository implements StagesRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityLog: ActivityLog,
+  ) {}
 
   listWithCounts(workspaceId: string): Promise<StageListItem[]> {
     return listWithCounts(this.prisma, workspaceId);
@@ -21,7 +25,7 @@ export class PrismaStagesRepository implements StagesRepository {
   ): Promise<T> {
     return this.prisma.$transaction(async (tx) => {
       await lockWorkspace(tx, workspaceId);
-      return work(new PrismaLockedStagesRepository(tx));
+      return work(new PrismaLockedStagesRepository(tx, this.activityLog));
     });
   }
 }

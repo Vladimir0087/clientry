@@ -11,9 +11,10 @@ import { StagesController } from './stages.controller.js';
 import { StagesRepository } from './stages.repository.js';
 import { StagesService } from './stages.service.js';
 import { PrismaModule } from '../../infra/prisma/prisma.module.js';
+import { ActivityModule } from '../activity/activity.module.js';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, ActivityModule],
   controllers: [DealsController, StagesController],
   providers: [
     DealsService,

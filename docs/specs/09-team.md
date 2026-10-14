@@ -152,7 +152,7 @@ docs/adr/0013-team-access.md
   shown again: a lost link is revoked and replaced.
 - An invite lives 7 days and works once. Lifetime and limit are constants in `INVITE_LIMITS`.
 - At most 20 pending invites per workspace; the 21st → 409 `INVITE_LIMIT_REACHED`. This bounds what
-  one owner account can create, and the demo account will be public (spec 11).
+  one owner account can create, and the demo account will be public (spec 12).
 - "Pending" means not used, not revoked and `expires_at` in the future. The list shows pending
   invites only, newest first: id, creator, created and expiry dates. Used, revoked and expired
   invites stay in the table as a record and are not listed.
@@ -527,7 +527,7 @@ screens:
 - A purge of used, revoked and expired invites.
 - Searching or paging members.
 - Activity entries for team events (spec 10 decides).
-- What the demo account may do on the team page (spec 11 decides).
+- What the demo account may do on the team page (spec 12 decides).
 - More roles or custom roles.
 
 ## 3. Data model
@@ -912,7 +912,7 @@ scroll, and by keyboard only.
     without one.
   - Main nav: `aria-current` on `/team`.
   - Login form: `NO_WORKSPACE` → the new message.
-- **e2e**: none (spec 12).
+- **e2e**: none (spec 13).
 - **Tooling checks**, done once on throwaway changes that are not committed; each must fail:
   - `features/team-invites` importing `@/features/manage-member` (lint);
   - `entities/member` importing `@/features/manage-member` (lint);

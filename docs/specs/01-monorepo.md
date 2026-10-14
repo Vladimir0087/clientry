@@ -202,8 +202,8 @@ everything in `.gitignore`.
 - `apps/web`, Next ESLint and TS presets, FSD boundaries lint (spec 04).
 - Dockerfiles and the Compose `full` profile (added with the apps they build).
 - Deployment and hosting environment variables (spec 05).
-- Playwright and e2e in CI (spec 12). Image build in CI (spec 05).
-- README (spec 13), changelog and release tooling.
+- Playwright and e2e in CI (spec 13). Image build in CI (spec 05).
+- README (spec 14), changelog and release tooling.
 - Turborepo remote cache.
 - Automated dependency updates, PR template, branch protection.
 

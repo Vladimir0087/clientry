@@ -3,13 +3,13 @@ import { Injectable } from '@nestjs/common';
 import { notificationSchema } from '@clientry/shared/notifications';
 import type { Notification } from '@clientry/shared/notifications';
 
-import type { NotificationCursor } from './notification-cursor.js';
 import type {
   NotificationOwner,
   NotificationPage,
   NotificationPageRequest,
   NotificationsRepository,
 } from './notifications.repository.js';
+import type { CreatedAtCursor } from '../../common/pagination/created-at-cursor.js';
 import type { Prisma } from '../../infra/prisma/generated/client.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
 
@@ -40,7 +40,7 @@ function toNotification(row: NotificationRow): Notification {
 }
 
 // Postgres cannot seek an index by the OR alone; the redundant bound starts the scan at the cursor.
-function before(cursor: NotificationCursor | null): Prisma.NotificationWhereInput {
+function before(cursor: CreatedAtCursor | null): Prisma.NotificationWhereInput {
   if (cursor === null) {
     return {};
   }

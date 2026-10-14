@@ -1,8 +1,7 @@
-import { dealEventSchema } from '@clientry/shared/deals';
 import type { Deal, DealEvent, DealRef, Stage } from '@clientry/shared/deals';
 
 import type { DealEdit } from './deal-changes.js';
-import { findDeal, visible } from './deal-reads.repository.js';
+import { findDeal } from './deal-reads.repository.js';
 import { referenceErrors } from './deal-references.js';
 import type {
   DealOwnership,
@@ -13,6 +12,8 @@ import type {
 import { BoardChangedError } from './errors.js';
 import { RequestValidationError } from '../../common/errors/request-validation.error.js';
 import { Prisma } from '../../infra/prisma/generated/client.js';
+import { visibleDeal } from '../../infra/prisma/visibility.js';
+import type { ActivityLog } from '../activity/activity-log.repository.js';
 
 const FOREIGN_KEY_VIOLATION = 'P2003';
 
@@ -24,7 +25,10 @@ function isForeignKeyViolation(error: unknown): boolean {
 }
 
 export class PrismaDealsTransaction implements DealsTransaction {
-  constructor(private readonly tx: Prisma.TransactionClient) {}
+  constructor(
+    private readonly tx: Prisma.TransactionClient,
+    private readonly activityLog: ActivityLog,
+  ) {}
 
   findById(workspaceId: string, id: string): Promise<Deal | null> {
     return findDeal(this.tx, workspaceId, id);
@@ -61,7 +65,7 @@ export class PrismaDealsTransaction implements DealsTransaction {
     dealId: string,
   ): Promise<string | null> {
     const row = await this.tx.deal.findFirst({
-      where: { id: dealId, stageId, ...visible(workspaceId) },
+      where: { id: dealId, stageId, ...visibleDeal(workspaceId) },
       select: { position: true },
     });
     return row?.position ?? null;
@@ -112,7 +116,7 @@ export class PrismaDealsTransaction implements DealsTransaction {
     edit: DealEdit,
   ): Promise<Deal | null> {
     const { count } = await this.tx.deal.updateMany({
-      where: { id, version, ...visible(workspaceId) },
+      where: { id, version, ...visibleDeal(workspaceId) },
       data: { ...edit, version: { increment: 1 } },
     });
     return count === 0 ? null : this.findById(workspaceId, id);
@@ -126,7 +130,7 @@ export class PrismaDealsTransaction implements DealsTransaction {
   ): Promise<Deal | null> {
     try {
       const { count } = await this.tx.deal.updateMany({
-        where: { id, version, ...visible(workspaceId) },
+        where: { id, version, ...visibleDeal(workspaceId) },
         data: { ...placement, version: { increment: 1 } },
       });
       return count === 0 ? null : await this.findById(workspaceId, id);
@@ -155,7 +159,7 @@ export class PrismaDealsTransaction implements DealsTransaction {
 
   async softDelete(workspaceId: string, id: string): Promise<boolean> {
     const { count } = await this.tx.deal.updateMany({
-      where: { id, ...visible(workspaceId) },
+      where: { id, ...visibleDeal(workspaceId) },
       data: { deletedAt: new Date(), version: { increment: 1 } },
     });
     return count > 0;
@@ -175,7 +179,6 @@ export class PrismaDealsTransaction implements DealsTransaction {
     actorId: string,
     event: DealEvent,
   ): Promise<void> {
-    const { type, payload } = dealEventSchema.parse(event);
-    await this.tx.activity.create({ data: { workspaceId, dealId, actorId, type, payload } });
+    await this.activityLog.record(this.tx, [{ workspaceId, actorId, subjectId: dealId, event }]);
   }
 }

@@ -410,7 +410,7 @@ The proxy cannot see whether a refresh token exists: the refresh cookie is sent 
 - Navigation and screens for clients, deals and tasks; nuqs comes with the first list (spec 06),
   dnd-kit with the board (spec 07), recharts with the dashboard (spec 10).
 - Page gating by role in the proxy (spec 09, if a page needs it; the API already enforces roles).
-- The demo login button (spec 11). Playwright e2e (spec 12).
+- The demo login button (spec 12). Playwright e2e (spec 13).
 - Password reset, email verification, account settings, avatars, a workspace switcher.
 - Refresh ahead of expiry and cross-tab sync: a logout in one tab is noticed by another on its next
   navigation or request.
@@ -571,7 +571,7 @@ horizontal scroll.
   - Register, login and refresh set `clientry_access` with the same Max-Age as `clientry_refresh`;
     the other attribute checks of spec 03 stay; an access cookie holding an expired JWT → 401
     `AUTHENTICATION_REQUIRED`.
-- **e2e**: none (spec 12). The proxy, real cookies and refresh in a browser are checked with
+- **e2e**: none (spec 13). The proxy, real cookies and refresh in a browser are checked with
   `browser-verify` (section 7).
 - **Tooling checks**, done once on throwaway files that are not committed; each must fail:
   - `entities/session` importing `@/features/auth`; `shared` importing `@/entities/session`;

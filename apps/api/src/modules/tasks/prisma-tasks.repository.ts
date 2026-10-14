@@ -12,10 +12,14 @@ import type {
   TasksTransaction,
 } from './tasks.repository.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
+import { ActivityLog } from '../activity/activity-log.repository.js';
 
 @Injectable()
 export class PrismaTasksRepository implements TasksRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityLog: ActivityLog,
+  ) {}
 
   findById(workspaceId: string, id: string): Promise<Task | null> {
     return findTask(this.prisma, workspaceId, id);
@@ -32,6 +36,6 @@ export class PrismaTasksRepository implements TasksRepository {
   }
 
   inTransaction<T>(work: (tasks: TasksTransaction) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction((tx) => work(new PrismaTasksTransaction(tx)));
+    return this.prisma.$transaction((tx) => work(new PrismaTasksTransaction(tx, this.activityLog)));
   }
 }

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { GreetingSkeleton } from './_components/greeting-skeleton';
+import { DashboardSkeleton } from './_components/dashboard-skeleton';
 
 export default function AppLoading(): ReactNode {
-  return <GreetingSkeleton />;
+  return <DashboardSkeleton />;
 }

@@ -70,6 +70,7 @@ export function createTaskTransactionMock(): TaskTransactionMock {
     }),
     softDelete: vi.fn<TasksTransaction['softDelete']>().mockResolvedValue(true),
     restore: vi.fn<TasksTransaction['restore']>().mockResolvedValue(true),
+    addActivity: vi.fn<TasksTransaction['addActivity']>().mockResolvedValue(undefined),
   };
 }
 

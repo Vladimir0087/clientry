@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decodeNotificationCursor, encodeNotificationCursor } from './notification-cursor.js';
+import { decodeCreatedAtCursor, encodeCreatedAtCursor } from './created-at-cursor.js';
 
 const CURSOR = {
   createdAt: '2026-10-15T06:00:01.204Z',
@@ -11,9 +11,9 @@ function encodeJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value)).toString('base64url');
 }
 
-describe('notification cursor', () => {
+describe('created-at cursor', () => {
   it('should decode what it encoded when the cursor round-trips', () => {
-    expect(decodeNotificationCursor(encodeNotificationCursor(CURSOR))).toEqual(CURSOR);
+    expect(decodeCreatedAtCursor(encodeCreatedAtCursor(CURSOR))).toEqual(CURSOR);
   });
 
   it.each([
@@ -23,6 +23,6 @@ describe('notification cursor', () => {
     ['a date that is not an instant', encodeJson(['yesterday', CURSOR.id])],
     ['an id that is not a UUID', encodeJson([CURSOR.createdAt, 'x'])],
   ])('should return null when the cursor holds %s', (_case, raw) => {
-    expect(decodeNotificationCursor(raw)).toBeNull();
+    expect(decodeCreatedAtCursor(raw)).toBeNull();
   });
 });

@@ -16,14 +16,21 @@ interface NavItem {
   readonly label: string;
 }
 
+const DASHBOARD_PATH = '/';
+
 const NAV_ITEMS: readonly NavItem[] = [
+  { href: DASHBOARD_PATH, label: 'Dashboard' },
   { href: CLIENTS_PATH, label: 'Clients' },
   { href: DEALS_PATH, label: 'Deals' },
   { href: TASKS_PATH, label: 'Tasks' },
   { href: TEAM_PATH, label: 'Team' },
 ];
 
+// Every path starts with "/", so the dashboard is current only on itself.
 function isCurrent(pathname: string, href: string): boolean {
+  if (href === DASHBOARD_PATH) {
+    return pathname === DASHBOARD_PATH;
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

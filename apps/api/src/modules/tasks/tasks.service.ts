@@ -84,13 +84,18 @@ export class TasksService {
     const { workspaceId } = user;
     const task = await this.tasks.inTransaction(async (tasks) => {
       await this.checkFields(tasks, workspaceId, input);
-      return tasks.create(workspaceId, user.id, {
+      const created = await tasks.create(workspaceId, user.id, {
         title: input.title,
         dueAt: input.dueAt,
         remindAt: input.remindAt ?? null,
         assigneeId: input.assigneeId,
         related: input.related ?? null,
       });
+      await tasks.addActivity(workspaceId, created.id, user.id, {
+        type: 'task_created',
+        payload: { assignee: created.assignee, dueAt: created.dueAt },
+      });
+      return created;
     });
     this.logger.log(this.logContext(user, task.id), 'Task created');
     await this.scheduleReminder(workspaceId, task);
@@ -183,7 +188,11 @@ export class TasksService {
         await this.checkFields(tasks, workspaceId, { assigneeId: current.assignee.id });
       }
       const doneAt = isDone ? new Date().toISOString() : null;
-      return { task: await this.write(tasks, workspaceId, id, { doneAt }), isChanged: true };
+      const task = await this.write(tasks, workspaceId, id, { doneAt });
+      if (isDone) {
+        await tasks.addActivity(workspaceId, id, user.id, { type: 'task_completed', payload: {} });
+      }
+      return { task, isChanged: true };
     });
     if (isChanged) {
       this.logger.log(this.logContext(user, id), isDone ? 'Task completed' : 'Task reopened');
