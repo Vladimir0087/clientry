@@ -48,8 +48,10 @@ Any one of:
 
 ### In scope, if revived
 
-- Oracle account with the home region `eu-frankfurt-1`, next to Neon; the choice is permanent and
-  Always Free resources exist only there. A decision on Pay As You Go against reclamation.
+- Oracle account with a home region chosen when the spec is revived; the choice is permanent and
+  Always Free resources exist only there. `eu-frankfurt-1` was picked next to Neon, but Neon and
+  Netlify's function moved to Ohio (ADR 0015), and Oracle has no Ohio region. A decision on Pay As
+  You Go against reclamation.
 - VM: AMD micro (1 GB) or ARM if available; ports 80 and 443 open in the security list and in the
   OS firewall, which Oracle's images close by default; swap; SSH by key only; unattended security
   updates.

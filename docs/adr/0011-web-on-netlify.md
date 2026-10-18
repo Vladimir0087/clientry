@@ -1,6 +1,6 @@
 # 0011 — Web on Netlify
 
-Status: accepted
+Status: accepted; the double Atlantic crossing is removed by 0015
 Date: 2026-10-11
 
 ## Context
