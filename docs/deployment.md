@@ -1,17 +1,18 @@
 # Deployment
 
 How Clientry runs on free hosting (stage 1) and how to set it up, deploy, roll back and rotate
-secrets. Decisions and their reasons are in [ADR 0008](adr/0008-deployment.md) and, for the web
-on Netlify, [ADR 0011](adr/0011-web-on-netlify.md).
+secrets. Decisions and their reasons are in [ADR 0008](adr/0008-deployment.md), for the web on
+Netlify in [ADR 0011](adr/0011-web-on-netlify.md), and for the region in
+[ADR 0015](adr/0015-backend-in-ohio.md).
 
 ## Topology
 
 ```mermaid
 flowchart LR
   browser[Browser] --> netlify["Netlify (web: edge near the visitor, functions in Ohio)"]
-  netlify -- "/api/* rewrite" --> render["Render web service (api, Frankfurt)"]
-  render --> neon[("Neon Postgres (eu-central-1)")]
-  render --> valkey[("Render Key Value (Frankfurt)")]
+  netlify -- "/api/* rewrite" --> render["Render web service (api, Ohio)"]
+  render --> neon[("Neon Postgres (us-east-2)")]
+  render --> valkey[("Render Key Value (Ohio)")]
   pinger[UptimeRobot] -- "/health/live" --> render
   ci[GitHub Actions] -- "image digest via deploy hook" --> render
   ci -- "netlify deploy" --> netlify
@@ -20,6 +21,8 @@ flowchart LR
 ```
 
 - The browser talks to the Netlify origin only; Next rewrites `/api/*` to the API.
+- Netlify's server function, the API, Valkey and Postgres share one region, Ohio: the function's
+  region is fixed on the free plan, so the rest follows it.
 - Every push to `main` runs CI; after `lint`, `typecheck`, `test` and `image` pass, `deploy-api`
   deploys the tested image digest to Render, then `deploy-web` builds the web and deploys it to
   Netlify. Neither host is connected to the repository.
@@ -28,18 +31,18 @@ flowchart LR
 
 Filled in at setup. Names may carry a suffix where the plain one is taken.
 
-| What                 | Value                                                                                                |
-| -------------------- | ---------------------------------------------------------------------------------------------------- |
-| Web                  | `https://clientry.netlify.app`                                                                       |
-| Swagger UI           | `https://clientry.netlify.app/api/docs`                                                              |
-| API probes           | `https://clientry-api.onrender.com/health/live`                                                      |
-| Render web service   | `clientry-api`                                                                                       |
-| Render Key Value     | `clientry-valkey`                                                                                    |
-| Neon project         | `clientry` (`little-math-93508455`), branch `production`, database `clientry`, role `clientry_owner` |
-| Netlify site         | `clientry` (`cfb430c6-8fbe-4e69-8c71-d7c45ef6b780`), team on the legacy Free plan                    |
-| Image                | `ghcr.io/vladimir0087/clientry-api` (private)                                                        |
-| UptimeRobot monitors | API liveness, web login                                                                              |
-| `TRUST_PROXY_HOPS`   | `5`, measured on 2026-10-11                                                                          |
+| What                 | Value                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Web                  | `https://clientry.netlify.app`                                                                                            |
+| Swagger UI           | `https://clientry.netlify.app/api/docs`                                                                                   |
+| API probes           | `https://clientry-api-ohio.onrender.com/health/live`                                                                      |
+| Render web service   | `clientry-api-ohio`, Ohio                                                                                                 |
+| Render Key Value     | `clientry-valkey`, Ohio                                                                                                   |
+| Neon project         | `clientry` (`rapid-butterfly-67544866`), AWS `us-east-2`, branch `production`, database `clientry`, role `clientry_owner` |
+| Netlify site         | `clientry` (`cfb430c6-8fbe-4e69-8c71-d7c45ef6b780`), team on the legacy Free plan                                         |
+| Image                | `ghcr.io/vladimir0087/clientry-api` (private)                                                                             |
+| UptimeRobot monitors | API liveness, web login                                                                                                   |
+| `TRUST_PROXY_HOPS`   | `5`, measured on 2026-10-11, again after the move to Ohio on 2026-10-18                                                   |
 
 ## Consoles
 
@@ -47,7 +50,7 @@ All accounts are the owner's personal ones (personal email, not a work address).
 
 | Service                      | Console                                                                       |
 | ---------------------------- | ----------------------------------------------------------------------------- |
-| Neon                         | https://console.neon.tech/app/projects/little-math-93508455                   |
+| Neon                         | https://console.neon.tech/app/projects/rapid-butterfly-67544866               |
 | Render                       | https://dashboard.render.com                                                  |
 | Netlify                      | https://app.netlify.com                                                       |
 | Netlify tokens               | https://app.netlify.com/user/applications#personal-access-tokens              |
@@ -76,13 +79,16 @@ else, the repository included.
 
 ### 2. Neon
 
-1. Create project `clientry`: Postgres 18, region AWS `eu-central-1` (Frankfurt), Free plan,
-   service Postgres database only. Name the database `clientry` in the same form; Neon creates
-   the role `clientry_owner`, one role for migrations and the app. The default branch is
-   `production`.
-2. Connect → branch `production`, database `clientry`, role `clientry_owner`, connection pooling
+1. Create project `clientry`: Postgres 18, region AWS `us-east-2` (Ohio), next to Netlify's
+   function, Free plan, service Postgres database only. Name the database `clientry` in the same
+   form; Neon creates the role `clientry_owner`, one role for migrations and the app. The default
+   branch is `production`.
+2. Fix the branch's compute at 0.25 CU, minimum and maximum: the budget in
+   [Background jobs](#background-jobs) is counted at 0.25 CU, and autoscaling to 2 CU would spend
+   the month's 100 CU-hours eight times faster.
+3. Connect → branch `production`, database `clientry`, role `clientry_owner`, connection pooling
    off. Copy the **direct** connection string (without `-pooler` in the host).
-3. Replace its whole query string, `channel_binding` included, with
+4. Replace its whole query string, `channel_binding` included, with
    `?sslmode=verify-full&sslaccept=strict`:
    - pg in the API reads `sslmode`: `verify-full` checks the certificate and the host name.
      Neon's `sslmode=require` means the same to pg today but prints a deprecation warning on
@@ -93,11 +99,16 @@ else, the repository included.
 
    This is `DATABASE_URL` for Render.
 
+5. SQL Editor: `SELECT current_setting('TimeZone');` answers `GMT`. adapter-pg sends dates without
+   an offset and Postgres reads them in the session's zone, so another default would shift every
+   stored moment.
+
 ### 3. Render Key Value
 
-Free plan, region Frankfurt, `maxmemory-policy` `noeviction` (BullMQ requires it: eviction would
-drop queued jobs silently), no entries in the IP allow list, so only services in the same region
-reach it. Its **internal** URL is `REDIS_URL` for Render.
+Free plan, region Ohio, `maxmemory-policy` `noeviction` (BullMQ requires it: eviction would drop
+queued jobs silently), no entries in the IP allow list, so only services in the same region reach
+it. Its **internal** URL is `REDIS_URL` for Render. A workspace may have one free Key Value at a
+time.
 
 ### 4. First image
 
@@ -156,8 +167,8 @@ pauses every site when the month's credits run out.
 4. Project configuration → Environment variables, both **plain** (not "Contains secret values"),
    the same value in every deploy context, every scope. Neither is a secret, and `API_URL` is
    baked into the build output, which Netlify's secret scanning rejects for a secret variable.
-   - `API_URL`: the Render origin, `https://clientry-api.onrender.com`, no trailing slash. Filled in
-     after step 7, then redeployed.
+   - `API_URL`: the Render origin, `https://clientry-api-ohio.onrender.com`, no trailing slash.
+     Filled in after step 7, then redeployed.
    - `JWT_PUBLIC_KEY`: the public line from step 1, everything after `JWT_PUBLIC_KEY=`.
 5. Project configuration → General → **Powered by Netlify badge**: off. New Free projects get it
    on, and its injected script carries no nonce, so the CSP blocks it and `smoke-live.sh` fails.
@@ -172,7 +183,7 @@ The site's origin `https://clientry.netlify.app` is the web origin from now on.
 New → Web Service → Existing image:
 
 - image `ghcr.io/vladimir0087/clientry-api:latest` with the credential from step 5;
-- region Frankfurt, instance type Free, no disk;
+- region Ohio, instance type Free, no disk;
 - health check path `/health/live`, **not** `/health/ready`: Render probes it continuously, and a
   probe that queries Postgres would keep Neon awake and spend its compute budget in under three
   weeks;
@@ -204,13 +215,13 @@ Repository → Settings → Secrets and variables → Actions, at repository lev
 on the free plan has no environments; they move to a `production` environment once the repository
 is public).
 
-| Name                     | Kind     | Value                               |
-| ------------------------ | -------- | ----------------------------------- |
-| `RENDER_DEPLOY_HOOK_URL` | secret   | step 7                              |
-| `NETLIFY_AUTH_TOKEN`     | secret   | step 6                              |
-| `NETLIFY_SITE_ID`        | variable | step 6                              |
-| `API_PUBLIC_URL`         | variable | `https://clientry-api.onrender.com` |
-| `WEB_PUBLIC_URL`         | variable | `https://clientry.netlify.app`      |
+| Name                     | Kind     | Value                                    |
+| ------------------------ | -------- | ---------------------------------------- |
+| `RENDER_DEPLOY_HOOK_URL` | secret   | step 7                                   |
+| `NETLIFY_AUTH_TOKEN`     | secret   | step 6                                   |
+| `NETLIFY_SITE_ID`        | variable | step 6                                   |
+| `API_PUBLIC_URL`         | variable | `https://clientry-api-ohio.onrender.com` |
+| `WEB_PUBLIC_URL`         | variable | `https://clientry.netlify.app`           |
 
 ### 9. First deploy
 
@@ -224,7 +235,7 @@ message.
 Two HTTP(S) monitors, 5-minute interval, no notifications (the email alert contact is unchecked
 on both); their status is visible in the dashboard:
 
-- `GET https://clientry-api.onrender.com/health/live`: keeps the API awake without touching the
+- `GET https://clientry-api-ohio.onrender.com/health/live`: keeps the API awake without touching the
   database. 31 days × 24 h = 744 h fits Render's 750 free hours only while this is the
   workspace's single free web service. It is essential: Netlify stops a proxied call after 30 s,
   and a sleeping API takes about a minute to wake, so the first form submit after a sleep fails
@@ -242,8 +253,9 @@ what it does to `X-Forwarded-For`, so the hops are measured; a host change means
    `req.headers.x-forwarded-for` and `req.clientIp`.
 3. Count the addresses in `x-forwarded-for` from the browser's public address to the end, the
    browser's included. That count is the value: Express then takes the browser's address as the
-   client. On 2026-10-11 the chain was the browser, Netlify's edge (Frankfurt), Netlify's function
-   (Ohio), Cloudflare in front of Render, and Render's own proxy: `5`.
+   client. On 2026-10-11 the chain was the browser, Netlify's edge (Frankfurt, near a European
+   browser), Netlify's function (Ohio), Cloudflare in front of Render, and Render's own proxy: `5`.
+   After the move to Ohio on 2026-10-18 it was the same five hops.
 4. Set it in Render's environment with **Save only**, then redeploy through a manual CI run of the
    live branch (see [Redeploy](#redeploy-or-ship-a-changed-variable)).
 5. Log in again: `clientIp` must be the browser's public address. Ten wrong passwords within a
@@ -282,7 +294,7 @@ image. The manual run deploys the tested digest instead.
 ### Manual smoke check
 
 ```sh
-bash .github/scripts/smoke-live.sh https://clientry.netlify.app https://clientry-api.onrender.com [<commit>]
+bash .github/scripts/smoke-live.sh https://clientry.netlify.app https://clientry-api-ohio.onrender.com [<commit>]
 ```
 
 ### Rollback
@@ -293,6 +305,36 @@ bash .github/scripts/smoke-live.sh https://clientry.netlify.app https://clientry
 - Web: Netlify → the site → Deploys → an earlier production deploy → **Publish deploy**. It is
   instant, and the next CI deploy publishes over it. To keep it, also lock auto publishing on the
   Deploys page; CI's web deploy then fails until it is unlocked.
+
+### Move to another region
+
+Neither Render nor Neon can change a region: the stack is created anew there and the old one is
+deleted. Done once, from Frankfurt to Ohio on 2026-10-18 (ADR 0015), in this order:
+
+1. Render → Billing: the free hours used this month, plus 24 for each remaining day, plus a few
+   hours while both web services run, stay under 750. Running out suspends every free web service
+   until the next month.
+2. Neon: rename the old project, create the new one as in [step 2](#2-neon), and copy its
+   `DATABASE_URL`.
+3. Render: delete the old Key Value, then create the new one as in [step 3](#3-render-key-value).
+   A workspace may have one free Key Value, so it goes first; until step 6 the old API serves
+   without reminders and its readiness fails.
+4. Render: create the new web service as in [step 7](#7-render-web-service) from the image tag
+   `sha-<commit>` that the live `/health/live` reports, not `latest`, which a branch run can move.
+   Copy `JWT_PRIVATE_KEY` from the old service, so Netlify's public key stays. Its first start
+   migrates the empty database; `/health/ready` answers 200.
+5. GitHub: `RENDER_DEPLOY_HOOK_URL` and `API_PUBLIC_URL` to the new service. Netlify: `API_URL`.
+6. A manual run on `main` (see [Redeploy](#redeploy-or-ship-a-changed-variable)) deploys to the new
+   service and rebuilds the web with the new `API_URL`.
+7. UptimeRobot: the API monitor's URL. The old service sleeps 15 minutes later and stops using
+   free hours.
+8. [Measure `TRUST_PROXY_HOPS`](#measure-trust_proxy_hops) and run the live checks.
+9. Delete the old web service and the old Neon project; update [Live](#live) and
+   [Consoles](#consoles).
+
+Until step 9 the way back is the old hook, `API_PUBLIC_URL`, `API_URL` and monitor URL, a new Key
+Value in the old region (after deleting the new one) set on the old service with Save only, and a
+manual run. Accounts created in the new region are lost unless the data is copied.
 
 ## Expiry and rotation
 
@@ -306,17 +348,17 @@ bash .github/scripts/smoke-live.sh https://clientry.netlify.app https://clientry
 
 ## Free-tier limits
 
-Checked on 2026-10-06, the web on 2026-10-11; hosts change their terms, so check again before
-relying on a number.
+Checked on 2026-10-14 for the move to Ohio, the web on 2026-10-11; hosts change their terms, so
+check again before relying on a number.
 
-| Part     | Where                       | Limits that matter                                                                                                                                                   |
-| -------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| web      | Netlify legacy Free, Ohio   | per month 125k function invocations per site, 1M edge function invocations, 100 GB; a function stops after 30 s, so a proxied call does too; HSTS on `*.netlify.app` |
-| api      | Render web service, Free    | 512 MB, 0.1 CPU; sleeps after 15 min without traffic, about 1 min to wake; 750 h per month                                                                           |
-| Valkey   | Render Key Value, Free      | 25 MB, 50 connections, no persistence, internal URL only                                                                                                             |
-| Postgres | Neon Free, AWS eu-central-1 | 1 GB storage, 100 CU-hours per month, scales to zero after 5 min (cannot be disabled on Free)                                                                        |
-| images   | GHCR, private package       | storage and transfer currently free                                                                                                                                  |
-| pinger   | UptimeRobot Free            | 5-minute interval, non-commercial use                                                                                                                                |
+| Part     | Where                         | Limits that matter                                                                                                                                                                                                                    |
+| -------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| web      | Netlify legacy Free, Ohio     | per month 125k function invocations per site, 1M edge function invocations, 100 GB; a function stops after 30 s, so a proxied call does too; HSTS on `*.netlify.app`                                                                  |
+| api      | Render web service Free, Ohio | 512 MB, 0.1 CPU; sleeps after 15 min without traffic, about 1 min to wake; 750 h per month per workspace, and using them all suspends every free web service until the next month                                                     |
+| Valkey   | Render Key Value Free, Ohio   | 25 MB, 50 connections, no persistence, internal URL only; one free instance per workspace                                                                                                                                             |
+| Postgres | Neon Free, AWS us-east-2      | per project 1 GB storage and 100 CU-hours per month; compute fixed at 0.25 CU, scales to zero after 5 min (cannot be disabled on Free); Free projects inactive for 90 days may be deleted, and the hourly sweep keeps this one active |
+| images   | GHCR, private package         | storage and transfer currently free                                                                                                                                                                                                   |
+| pinger   | UptimeRobot Free              | 5-minute interval, non-commercial use                                                                                                                                                                                                 |
 
 Going over Netlify's legacy limits applies a paid add-on, which an account without a card cannot
 pay, so its sites are paused. The demo's traffic is far below them; the team's usage page shows
