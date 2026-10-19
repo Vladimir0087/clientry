@@ -1,6 +1,7 @@
 import { ConflictError } from '../../common/errors/conflict.error.js';
 import { ForbiddenError } from '../../common/errors/forbidden.error.js';
 import { NotFoundError } from '../../common/errors/not-found.error.js';
+import { ServiceUnavailableError } from '../../common/errors/service-unavailable.error.js';
 import { UnauthenticatedError } from '../../common/errors/unauthenticated.error.js';
 
 export class EmailTakenError extends ConflictError {
@@ -49,5 +50,18 @@ export class InviteInvalidError extends NotFoundError {
 export class AlreadyInWorkspaceError extends ConflictError {
   constructor() {
     super('ALREADY_IN_WORKSPACE', 'This account already belongs to a workspace');
+  }
+}
+
+// Before the first reset has built the demo workspace.
+export class DemoUnavailableError extends ServiceUnavailableError {
+  constructor() {
+    super('DEMO_UNAVAILABLE', 'The demo is not ready yet');
+  }
+}
+
+export class DemoLockedError extends ForbiddenError {
+  constructor() {
+    super('DEMO_LOCKED', 'This action is turned off in the demo workspace');
   }
 }

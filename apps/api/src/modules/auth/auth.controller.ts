@@ -15,6 +15,7 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
 import {
+  demoLoginRequestSchema,
   inviteLoginRequestSchema,
   invitePreviewRequestSchema,
   invitePreviewResponseSchema,
@@ -24,6 +25,7 @@ import {
   sessionResponseSchema,
 } from '@clientry/shared/auth';
 import type {
+  DemoLoginRequest,
   InviteLoginRequest,
   InvitePreviewRequest,
   InvitePreviewResponse,
@@ -39,6 +41,7 @@ import type { IssuedSession } from './auth.service.js';
 import {
   AlreadyInWorkspaceError,
   AuthenticationRequiredError,
+  DemoUnavailableError,
   EmailTakenError,
   InvalidCredentialsError,
   InvalidRefreshTokenError,
@@ -125,6 +128,21 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<SessionResponse> {
     return this.respond(response, await this.auth.login(input));
+  }
+
+  @Post('demo')
+  @Public()
+  @ApiOperation({ summary: 'Sign in to the shared demo workspace as its owner or a manager' })
+  @ResponseSchema(HttpStatus.OK, sessionResponseSchema)
+  @ApiInvalidRequest('/api/auth/demo', 'role', 'Invalid option: expected one of "owner"|"manager"')
+  @ApiUntrustedOrigin('/api/auth/demo')
+  @ApiErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, '/api/auth/demo', new DemoUnavailableError())
+  @RateLimit(10, MINUTE_MS, '/api/auth/demo')
+  async startDemo(
+    @Body({ schema: demoLoginRequestSchema }) { role }: DemoLoginRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<SessionResponse> {
+    return this.respond(response, await this.auth.startDemoSession(role));
   }
 
   // POST, not GET: the token stays out of URLs and request logs. It changes nothing.

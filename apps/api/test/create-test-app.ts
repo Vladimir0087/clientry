@@ -12,6 +12,7 @@ import { TEST_APP_VERSION, TRUSTED_ORIGIN } from './support/test-env.js';
 import { loadConfig } from '../src/infra/config/app-config.js';
 import type { AppConfig } from '../src/infra/config/app-config.js';
 import { createLogger } from '../src/infra/logger/create-logger.js';
+import { DemoResetService } from '../src/modules/demo/demo-reset.service.js';
 
 export const UNREACHABLE_DATABASE_URL = 'postgresql://clientry:clientry@127.0.0.1:1/clientry';
 export const UNREACHABLE_REDIS_URL = 'redis://127.0.0.1:1';
@@ -67,7 +68,12 @@ export async function createTestApp(overrides: TestAppOverrides = {}): Promise<T
   if (overrides.isRateLimited !== true) {
     builder.overrideGuard(ThrottlerGuard).useValue({ canActivate: () => true });
   }
-  for (const { token, value } of overrides.providers ?? []) {
+  // The demo job's first tick would race the tests' TRUNCATE; demo tests reset it themselves.
+  const demoReset: ProviderOverride[] =
+    overrides.shouldRunJobs === true
+      ? [{ token: DemoResetService, value: { reset: () => Promise.resolve() } }]
+      : [];
+  for (const { token, value } of [...demoReset, ...(overrides.providers ?? [])]) {
     builder.overrideProvider(token).useValue(value);
   }
   const moduleRef = await builder.compile();

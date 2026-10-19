@@ -10,8 +10,25 @@ export const PERMISSIONS = {
 
 export type Permission = keyof typeof PERMISSIONS;
 
+// Off for every role in the shared demo: with them a visitor could take the workspace over.
+export const DEMO_LOCKED_PERMISSIONS: readonly Permission[] = Object.freeze([
+  'team.manage',
+  'workspace.manage',
+]);
+
 export function hasPermission(role: MemberRole, permission: Permission): boolean {
   return PERMISSIONS[permission][role];
+}
+
+export interface PermissionActor {
+  readonly role: MemberRole;
+  readonly isDemo: boolean;
+}
+
+export function can({ role, isDemo }: PermissionActor, permission: Permission): boolean {
+  return (
+    hasPermission(role, permission) && !(isDemo && DEMO_LOCKED_PERMISSIONS.includes(permission))
+  );
 }
 
 export interface RecordActor {

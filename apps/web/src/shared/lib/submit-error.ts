@@ -43,6 +43,14 @@ export function unexpectedAlert(error: unknown): FormAlertContent {
   };
 }
 
+// The outcomes of a request without fields: a rate limit, or an unreachable or failed API.
+export function requestFailureAlert(error: unknown): FormAlertContent {
+  if (error instanceof ApiError && error.status === TOO_MANY_REQUESTS) {
+    return rateLimitAlert(error.retryAfterSeconds);
+  }
+  return unexpectedAlert(error);
+}
+
 // tags.1 belongs to the tags field: an item's error shows on the control that holds the list.
 function findField<T extends FieldValues>(
   fields: readonly Path<T>[],
@@ -83,8 +91,5 @@ export function applySubmitError<T extends FieldValues>(
   if (error.code === VALIDATION_FAILED && error.errors.length > 0) {
     return applyFieldErrors(form, error.errors, fields);
   }
-  if (error.status === TOO_MANY_REQUESTS) {
-    return rateLimitAlert(error.retryAfterSeconds);
-  }
-  return unexpectedAlert(error);
+  return requestFailureAlert(error);
 }

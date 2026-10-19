@@ -16,11 +16,13 @@ const OWNER: AuthUser = {
   id: '0199a3c4-5e6f-7a8b-9c0d-1e2f3a4b5c6d',
   workspaceId: WORKSPACE_ID,
   role: 'owner',
+  isDemo: false,
 };
 const MANAGER: AuthUser = {
   id: '0199a3c4-6a7b-7c8d-9e0f-1a2b3c4d5e6f',
   workspaceId: WORKSPACE_ID,
   role: 'manager',
+  isDemo: false,
 };
 const CLIENT_ID = '0199a3c4-7d10-7c2e-9a4b-5c6d7e8f9a0b';
 

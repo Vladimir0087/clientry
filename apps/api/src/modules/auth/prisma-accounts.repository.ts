@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { InvitePreviewResponse } from '@clientry/shared/auth';
+import type { InvitePreviewResponse, MemberRole } from '@clientry/shared/auth';
 
 import type {
   Account,
@@ -20,7 +20,9 @@ const ACCOUNT_SELECT = {
   id: true,
   email: true,
   name: true,
-  membership: { select: { role: true, workspace: { select: { id: true, name: true } } } },
+  membership: {
+    select: { role: true, workspace: { select: { id: true, name: true, isDemo: true } } },
+  },
 } satisfies Prisma.UserSelect;
 
 type AccountRow = Prisma.UserGetPayload<{ select: typeof ACCOUNT_SELECT }>;
@@ -126,6 +128,15 @@ export class PrismaAccountsRepository implements AccountsRepository {
       select: ACCOUNT_SELECT,
     });
     return row ? toAccount(row) : null;
+  }
+
+  async findDemoAccount(role: MemberRole): Promise<Account | null> {
+    const row = await this.prisma.membership.findFirst({
+      where: { role, workspace: { isDemo: true } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { user: { select: ACCOUNT_SELECT } },
+    });
+    return row ? toAccount(row.user) : null;
   }
 
   async findInvitePreview(

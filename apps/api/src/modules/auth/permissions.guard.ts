@@ -3,10 +3,10 @@ import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 
-import { hasPermission } from '@clientry/shared/auth';
+import { can, hasPermission } from '@clientry/shared/auth';
 import type { Permission } from '@clientry/shared/auth';
 
-import { AuthenticationRequiredError, InsufficientRoleError } from './errors.js';
+import { AuthenticationRequiredError, DemoLockedError, InsufficientRoleError } from './errors.js';
 import { getAuthUser } from '../../common/auth/auth-user.js';
 import { PERMISSION_KEY } from '../../common/auth/require-permission.decorator.js';
 
@@ -26,8 +26,13 @@ export class PermissionsGuard implements CanActivate {
     if (!user) {
       throw new AuthenticationRequiredError();
     }
+    // The role first: a demo manager is refused for his role, as any manager is. Past it, can
+    // refuses only for the demo lock.
     if (!hasPermission(user.role, permission)) {
       throw new InsufficientRoleError();
+    }
+    if (!can(user, permission)) {
+      throw new DemoLockedError();
     }
     return true;
   }

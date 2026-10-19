@@ -1,4 +1,4 @@
-import type { InvitePreviewResponse, SessionResponse } from '@clientry/shared/auth';
+import type { InvitePreviewResponse, MemberRole, SessionResponse } from '@clientry/shared/auth';
 
 import type { DefaultStage } from './default-stages.js';
 
@@ -46,6 +46,8 @@ export abstract class AccountsRepository {
   abstract findCredentialsByEmail(email: string): Promise<AccountCredentials | null>;
   // Null when the user or their membership no longer exists.
   abstract findAccount(userId: string): Promise<Account | null>;
+  // The earliest-joined member with the role in the demo workspace; null before the first reset.
+  abstract findDemoAccount(role: MemberRole): Promise<Account | null>;
   // Null unless a pending invite has the hash.
   abstract findInvitePreview(
     tokenHash: Uint8Array<ArrayBuffer>,

@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { DEMO_LOCKED_PERMISSIONS } from '@clientry/shared/auth';
+import type { Permission } from '@clientry/shared/auth';
+
 import { createTestApp } from './create-test-app.js';
 import type { TestApp } from './create-test-app.js';
 import { TestOnlyModule } from './support/test-only.module.js';
@@ -657,6 +660,36 @@ describe('OpenAPI document', () => {
           codes: expect.arrayContaining(['INSUFFICIENT_ROLE']) as unknown,
         });
       }
+    });
+
+    it('should list 403 DEMO_LOCKED on every operation behind a permission locked in the demo', () => {
+      const locked = operations().filter(([, op]) => {
+        const permission = op[PERMISSION_OPERATION_EXTENSION] as Permission | undefined;
+        return permission !== undefined && DEMO_LOCKED_PERMISSIONS.includes(permission);
+      });
+
+      expect(locked.length).toBeGreaterThan(0);
+      for (const [name, op] of locked) {
+        expect({ name, codes: forbiddenCodes(op) }).toEqual({
+          name,
+          codes: expect.arrayContaining(['DEMO_LOCKED']) as unknown,
+        });
+      }
+    });
+
+    it('should document the demo entry under auth with no security and its responses', () => {
+      const op = operation('post', '/api/auth/demo');
+
+      expect(op?.tags).toEqual(['auth']);
+      expect(op?.security).toEqual([]);
+      expect(Object.keys(op?.responses ?? {}).toSorted()).toEqual([
+        '200',
+        '400',
+        '403',
+        '429',
+        '503',
+      ]);
+      expect(forbiddenCodes(op ?? {})).toContain('UNTRUSTED_ORIGIN');
     });
 
     it.each(MEMBER_OPERATIONS.filter(([, path]) => path.includes('{id}')))(

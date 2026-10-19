@@ -5,6 +5,7 @@ import type {
   InvitePreviewResponse,
   InviteRegisterRequest,
   LoginRequest,
+  MemberRole,
   RegisterRequest,
   SessionResponse,
 } from '@clientry/shared/auth';
@@ -16,6 +17,7 @@ import { DEFAULT_STAGES } from './default-stages.js';
 import {
   AlreadyInWorkspaceError,
   AuthenticationRequiredError,
+  DemoUnavailableError,
   InvalidCredentialsError,
   InviteInvalidError,
   InvalidRefreshTokenError,
@@ -59,7 +61,12 @@ function isTokenUsable(token: StoredRefreshToken, now: Date): boolean {
 }
 
 function toAuthUser(account: Account): AuthUser {
-  return { id: account.user.id, workspaceId: account.workspace.id, role: account.role };
+  return {
+    id: account.user.id,
+    workspaceId: account.workspace.id,
+    role: account.role,
+    isDemo: account.workspace.isDemo,
+  };
 }
 
 @Injectable()
@@ -99,6 +106,19 @@ export class AuthService {
     await this.sessions.deleteEndedSessions(credentials.userId, now);
     this.logger.log({ userId: credentials.userId }, 'Logged in');
     return this.startSession(credentials.account, now);
+  }
+
+  // Visitors share the demo user; each press starts a session of its own.
+  async startDemoSession(role: MemberRole): Promise<IssuedSession> {
+    const account = await this.accounts.findDemoAccount(role);
+    if (!account) {
+      throw new DemoUnavailableError();
+    }
+    const now = new Date();
+    await this.sessions.deleteEndedSessions(account.user.id, now);
+    const issued = await this.startSession(account, now);
+    this.logger.log({ userId: account.user.id, role }, 'Demo session started');
+    return issued;
   }
 
   async previewInvite(token: string): Promise<InvitePreviewResponse> {

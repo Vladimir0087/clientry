@@ -15,6 +15,7 @@
     "generate": "prisma generate",
     "db:migrate": "prisma migrate dev && prisma generate",
     "db:deploy": "prisma migrate deploy",
+    "db:seed": "nest build && prisma db seed",
     "jwt:keygen": "node scripts/generate-jwt-keys.ts",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",

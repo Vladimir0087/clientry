@@ -19,7 +19,9 @@ export function useRenameWorkspace(): UseMutationResult<WorkspaceResponse, Error
       const hasRefetchInFlight = queryClient.isFetching({ queryKey: sessionKeys.current }) > 0;
       await queryClient.cancelQueries({ queryKey: sessionKeys.current });
       queryClient.setQueryData<SessionResponse>(sessionKeys.current, (session) =>
-        session === undefined ? session : { ...session, workspace },
+        session === undefined
+          ? session
+          : { ...session, workspace: { ...session.workspace, ...workspace } },
       );
       if (hasRefetchInFlight) {
         void queryClient.invalidateQueries({ queryKey: sessionKeys.current });

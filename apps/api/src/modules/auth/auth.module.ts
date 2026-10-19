@@ -52,7 +52,7 @@ import { QueueFactory } from '../../infra/queue/queue-factory.js';
     { provide: AccountsRepository, useClass: PrismaAccountsRepository },
     { provide: SessionsRepository, useClass: PrismaSessionsRepository },
   ],
-  exports: [AccessTokenGuard, PermissionsGuard, SessionRevocation],
+  exports: [AccessTokenGuard, PermissionsGuard, SessionRevocation, PasswordHasher],
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

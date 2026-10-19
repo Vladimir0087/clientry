@@ -4,19 +4,22 @@ import { useEffect, useId, useRef } from 'react';
 import type * as React from 'react';
 
 import { MemberTable, useMembers } from '@/entities/member';
-import { useSession } from '@/entities/session';
+import { permissionActor, useSession } from '@/entities/session';
 import { MemberActions } from '@/features/manage-member';
 import { WorkspaceName } from '@/features/rename-workspace';
 import { PendingInvites } from '@/features/team-invites';
 import { PageHeading } from '@/shared/ui/page-heading';
 import { RetryMessage } from '@/shared/ui/retry-message';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { hasPermission } from '@clientry/shared/auth';
+import { can, hasPermission } from '@clientry/shared/auth';
 import type { SessionResponse } from '@clientry/shared/auth';
 import type { Member } from '@clientry/shared/workspaces';
 
 const PAGE_HEADING_ID = 'team-heading';
 const SECTION_HEADING_CLASS = 'text-lg font-semibold outline-none';
+const MANAGERS_LINE = 'Only owners can invite people and change roles.';
+const DEMO_LINE =
+  'Inviting people, changing roles, removing members and renaming the workspace are turned off in the demo.';
 
 // The owner controls go with the caller's role, so the page heading takes focus.
 function focusPageHeadingById(): void {
@@ -37,7 +40,7 @@ function WorkspaceSection(): React.JSX.Element {
       {session.data !== undefined ? (
         <WorkspaceName
           name={session.data.workspace.name}
-          canRename={hasPermission(session.data.role, 'workspace.manage')}
+          canRename={can(permissionActor(session.data), 'workspace.manage')}
         />
       ) : session.isError ? (
         <RetryMessage
@@ -81,6 +84,11 @@ function useFocusHeadingWhenFocusGoes(
   };
 }
 
+// A manager is held back by the role, the demo owner by the demo lock.
+function lockedLineFor(session: SessionResponse): string {
+  return hasPermission(session.role, 'team.manage') ? DEMO_LINE : MANAGERS_LINE;
+}
+
 interface MembersSectionProps {
   readonly session: SessionResponse | undefined;
   readonly canManageTeam: boolean;
@@ -120,9 +128,7 @@ function MembersSection({ session, canManageTeam }: MembersSectionProps): React.
         )}
       </h2>
       {session !== undefined && !canManageTeam && (
-        <p className="text-sm text-muted-foreground">
-          Only owners can invite people and change roles.
-        </p>
+        <p className="text-sm text-muted-foreground">{lockedLineFor(session)}</p>
       )}
       {items !== undefined ? (
         <MemberTable
@@ -164,7 +170,7 @@ function useFocusWhenControlsGo(canManageTeam: boolean): void {
 export function TeamView(): React.JSX.Element {
   const session = useSession();
   const canManageTeam =
-    session.data !== undefined && hasPermission(session.data.role, 'team.manage');
+    session.data !== undefined && can(permissionActor(session.data), 'team.manage');
   useFocusWhenControlsGo(canManageTeam);
   return (
     <div className="flex flex-col gap-8">

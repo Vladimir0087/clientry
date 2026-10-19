@@ -12,6 +12,7 @@ import {
 } from './auth.service.js';
 import {
   AlreadyInWorkspaceError,
+  DemoUnavailableError,
   EmailTakenError,
   InvalidCredentialsError,
   InvalidRefreshTokenError,
@@ -27,7 +28,7 @@ const PASSWORD = 'correct horse battery';
 
 const ACCOUNT: Account = {
   user: { id: '0199a3c4-5e6f-7a8b-9c0d-1e2f3a4b5c6d', email: 'ann@studio.dev', name: 'Ann' },
-  workspace: { id: '0199a3c4-5e70-7b1c-8d2e-3f4a5b6c7d8e', name: 'Pixel Studio' },
+  workspace: { id: '0199a3c4-5e70-7b1c-8d2e-3f4a5b6c7d8e', name: 'Pixel Studio', isDemo: false },
   role: 'owner',
 };
 
@@ -89,6 +90,7 @@ function createAccountsMock() {
         account: ACCOUNT,
       }),
     findAccount: vi.fn<AccountsRepository['findAccount']>().mockResolvedValue(ACCOUNT),
+    findDemoAccount: vi.fn<AccountsRepository['findDemoAccount']>().mockResolvedValue(null),
     findInvitePreview: vi.fn<AccountsRepository['findInvitePreview']>().mockResolvedValue(null),
     createInvitedAccount: vi
       .fn<AccountsRepository['createInvitedAccount']>()
@@ -133,11 +135,12 @@ describe('AuthService', () => {
   let tokens: ReturnType<typeof createTokensMock>;
   let hasher: ReturnType<typeof createHasherMock>;
   let warn: MockInstance<Logger['warn']>;
+  let log: MockInstance<Logger['log']>;
   let service: AuthService;
 
   beforeEach(() => {
     vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
-    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     accounts = createAccountsMock();
     sessions = createSessionsMock();
@@ -237,9 +240,73 @@ describe('AuthService', () => {
       await service.login({ email: ACCOUNT.user.email, password: PASSWORD });
 
       expect(tokens.sign).toHaveBeenCalledWith(
-        { id: ACCOUNT.user.id, workspaceId: ACCOUNT.workspace.id, role: 'owner' },
+        { id: ACCOUNT.user.id, workspaceId: ACCOUNT.workspace.id, role: 'owner', isDemo: false },
         'session-new',
       );
+    });
+  });
+
+  describe('startDemoSession', () => {
+    const DEMO_MANAGER: Account = {
+      user: { id: '0199d0a0-0000-7000-8000-000000000002', email: 'max@x.example', name: 'Max' },
+      workspace: { id: '0199d0a0-0000-7000-8000-000000000100', name: 'Pixel Studio', isDemo: true },
+      role: 'manager',
+    };
+
+    beforeEach(() => {
+      accounts.findDemoAccount.mockResolvedValue(DEMO_MANAGER);
+    });
+
+    it('should ask the repository for the demo account of the role when a demo session starts', async () => {
+      await service.startDemoSession('manager');
+
+      expect(accounts.findDemoAccount).toHaveBeenCalledWith('manager');
+    });
+
+    it("should delete the demo user's ended sessions before the new one when a demo session starts", async () => {
+      await service.startDemoSession('manager');
+
+      expect(sessions.deleteEndedSessions).toHaveBeenCalledWith(DEMO_MANAGER.user.id, NOW);
+      expect(sessions.deleteEndedSessions.mock.invocationCallOrder[0]).toBeLessThan(
+        sessions.createSession.mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
+    it('should sign a demo session and return the demo account when the demo exists', async () => {
+      const issued = await service.startDemoSession('manager');
+
+      expect(issued.session).toEqual(DEMO_MANAGER);
+      expect(tokens.sign).toHaveBeenCalledWith(
+        {
+          id: DEMO_MANAGER.user.id,
+          workspaceId: DEMO_MANAGER.workspace.id,
+          role: 'manager',
+          isDemo: true,
+        },
+        'session-new',
+      );
+    });
+
+    it('should log the user and the role when a demo session starts', async () => {
+      await service.startDemoSession('manager');
+
+      expect(log).toHaveBeenCalledWith(
+        { userId: DEMO_MANAGER.user.id, role: 'manager' },
+        'Demo session started',
+      );
+    });
+
+    it('should throw DemoUnavailableError and start no session when there is no demo yet', async () => {
+      accounts.findDemoAccount.mockResolvedValue(null);
+
+      await expect(service.startDemoSession('owner')).rejects.toThrow(DemoUnavailableError);
+      expect(sessions.createSession).not.toHaveBeenCalled();
+    });
+
+    it('should throw NoWorkspaceError when the membership is gone before the session starts', async () => {
+      sessions.createSession.mockResolvedValue(null);
+
+      await expect(service.startDemoSession('manager')).rejects.toThrow(NoWorkspaceError);
     });
   });
 

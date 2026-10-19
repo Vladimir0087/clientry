@@ -87,6 +87,8 @@ model User {
 model Workspace {
   id            String         @id @default(uuid(7)) @db.Uuid
   name          String
+  // Set only by the demo module, on its one workspace.
+  isDemo        Boolean        @default(false) @map("is_demo")
   createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
   memberships   Membership[]

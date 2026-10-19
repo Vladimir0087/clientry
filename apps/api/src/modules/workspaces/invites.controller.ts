@@ -32,12 +32,16 @@ import {
   ApiInvalidRequest,
 } from '../../common/http/api-error-response.decorator.js';
 import { ResponseSchema } from '../../common/http/response-schema.decorator.js';
-import { AuthenticationRequiredError, InsufficientRoleError } from '../auth/errors.js';
+import {
+  AuthenticationRequiredError,
+  DemoLockedError,
+  InsufficientRoleError,
+} from '../auth/errors.js';
 
 const COLLECTION = '/api/invites';
 const ITEM = '/api/invites/0199b0d2-1a2b-7c3d-8e4f-5a6b7c8d9e0f';
 
-// A read is never checked for the origin, so its 403 has one cause.
+// A read is never checked for the origin, so its 403 has no UNTRUSTED_ORIGIN.
 function ManageInvites(instance: string, access: 'read' | 'write'): MethodDecorator {
   const forbidden =
     access === 'write'
@@ -46,8 +50,14 @@ function ManageInvites(instance: string, access: 'read' | 'write'): MethodDecora
           instance,
           new UntrustedOriginError(),
           new InsufficientRoleError(),
+          new DemoLockedError(),
         )
-      : ApiErrorResponse(HttpStatus.FORBIDDEN, instance, new InsufficientRoleError());
+      : ApiErrorResponse(
+          HttpStatus.FORBIDDEN,
+          instance,
+          new InsufficientRoleError(),
+          new DemoLockedError(),
+        );
   return applyDecorators(RequirePermission('team.manage'), forbidden);
 }
 

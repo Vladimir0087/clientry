@@ -20,6 +20,7 @@ const OWNER: AuthUser = {
   id: '0199a3c4-5e6f-7a8b-9c0d-1e2f3a4b5c6d',
   workspaceId: '0199a3c4-5e70-7b1c-8d2e-3f4a5b6c7d8e',
   role: 'owner',
+  isDemo: false,
 };
 
 const SESSION_ID = '0199a3c4-5e71-7c2d-9e3f-4a5b6c7d8e9f';
@@ -62,7 +63,11 @@ describe('AccessTokenGuard', () => {
 
   beforeEach(() => {
     findLiveMembership.mockReset();
-    findLiveMembership.mockResolvedValue({ workspaceId: OWNER.workspaceId, role: OWNER.role });
+    findLiveMembership.mockResolvedValue({
+      workspaceId: OWNER.workspaceId,
+      role: OWNER.role,
+      isDemo: false,
+    });
   });
 
   it('should pass a public route when no cookie is sent', async () => {
@@ -106,7 +111,11 @@ describe('AccessTokenGuard', () => {
   });
 
   it('should take the role from the database when the claims say owner and it says manager', async () => {
-    findLiveMembership.mockResolvedValue({ workspaceId: OWNER.workspaceId, role: 'manager' });
+    findLiveMembership.mockResolvedValue({
+      workspaceId: OWNER.workspaceId,
+      role: 'manager',
+      isDemo: false,
+    });
     const { context, request } = await contextWithToken(OWNER);
 
     await guard.canActivate(context);

@@ -5,10 +5,10 @@ import { useCallback, useRef, useState } from 'react';
 import type * as React from 'react';
 
 import { useStages } from '@/entities/deal';
-import { useSession } from '@/entities/session';
+import { permissionActor, useSession } from '@/entities/session';
 import { RetryMessage } from '@/shared/ui/retry-message';
-import { hasPermission } from '@clientry/shared/auth';
-import type { MemberRole } from '@clientry/shared/auth';
+import { can } from '@clientry/shared/auth';
+import type { PermissionActor } from '@clientry/shared/auth';
 import type { StageListItem } from '@clientry/shared/deals';
 
 import { AddStageForm } from './add-stage-form';
@@ -38,7 +38,7 @@ function controlsFor(stage: StageListItem, openStages: readonly StageListItem[])
 interface StageListProps {
   readonly stages: readonly StageListItem[];
   // Undefined while the session loads: neither the controls nor the note show yet.
-  readonly role: MemberRole | undefined;
+  readonly actor: PermissionActor | undefined;
   readonly headingId: string;
 }
 
@@ -120,16 +120,16 @@ function liveStage(stages: readonly StageListItem[], stage: StageListItem): Stag
   return stages.find((item) => item.id === stage.id) ?? stage;
 }
 
-function StageList({ stages, role, headingId }: StageListProps): React.JSX.Element {
+function StageList({ stages, actor, headingId }: StageListProps): React.JSX.Element {
   const { rowFocusRequest, handleFocusDone, handleMove } = useStageReorder(stages);
   const { deleting, focusHeading, handleDelete, handleClose, handleReturnFocus } =
     useStageDeleting(headingId);
   const openStages = openStagesOf(stages);
-  const canManage = role !== undefined && hasPermission(role, 'stages.manage');
+  const canManage = actor !== undefined && can(actor, 'stages.manage');
 
   return (
     <div className="flex flex-col gap-6">
-      {role !== undefined && !canManage && (
+      {actor !== undefined && !canManage && (
         <p className="text-sm text-muted-foreground">Only owners can change stages.</p>
       )}
       <ol className="flex max-w-3xl flex-col divide-y rounded-lg border">
@@ -164,7 +164,8 @@ export function StageManager({ headingId }: { readonly headingId: string }): Rea
   const stages = useStages();
   const session = useSession();
   if (stages.data !== undefined) {
-    return <StageList stages={stages.data.items} role={session.data?.role} headingId={headingId} />;
+    const actor = session.data === undefined ? undefined : permissionActor(session.data);
+    return <StageList stages={stages.data.items} actor={actor} headingId={headingId} />;
   }
   if (stages.isPending) {
     return <StageListSkeleton />;

@@ -4,30 +4,15 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 
-import { InvalidConfigError } from '@clientry/shared/common';
-
 import { AppModule } from './app.module.js';
 import { createApp } from './configure-app.js';
-import { loadConfig } from './infra/config/app-config.js';
-import type { AppConfig } from './infra/config/app-config.js';
+import { loadConfigOrExit } from './infra/config/load-config-or-exit.js';
 import { createLogger } from './infra/logger/create-logger.js';
 import {
   registerFatalHandlers,
   registerShutdownDeadline,
   SHUTDOWN_SIGNALS,
 } from './process-handlers.js';
-
-function loadConfigOrExit(): AppConfig {
-  try {
-    return loadConfig(process.env);
-  } catch (error) {
-    if (!(error instanceof InvalidConfigError)) {
-      throw error;
-    }
-    process.stderr.write(`${error.message}\n`);
-    process.exit(1);
-  }
-}
 
 const config = loadConfigOrExit();
 const logger = createLogger(config);

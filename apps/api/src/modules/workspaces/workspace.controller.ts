@@ -14,7 +14,11 @@ import {
   ApiInvalidRequest,
 } from '../../common/http/api-error-response.decorator.js';
 import { ResponseSchema } from '../../common/http/response-schema.decorator.js';
-import { AuthenticationRequiredError, InsufficientRoleError } from '../auth/errors.js';
+import {
+  AuthenticationRequiredError,
+  DemoLockedError,
+  InsufficientRoleError,
+} from '../auth/errors.js';
 
 const WORKSPACE = '/api/workspace';
 
@@ -35,6 +39,7 @@ export class WorkspaceController {
     WORKSPACE,
     new UntrustedOriginError(),
     new InsufficientRoleError(),
+    new DemoLockedError(),
   )
   rename(
     @CurrentUser() user: AuthUser,
