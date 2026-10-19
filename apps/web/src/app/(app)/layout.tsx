@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { createQueryClient } from '@/shared/api/query-client';
 import { LOGIN_PATH } from '@/shared/lib/redirect-target';
 
+import { DemoBanner } from './_components/demo-banner';
 import { ShellHeader } from './_components/shell-header';
 import { getPrefetchRequest } from './_lib/access-session';
 import { prefetchSession, prefetchUnreadCount } from './_lib/prefetch';
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: AppLayoutProps): Promise<R
       >
         Skip to content
       </a>
+      <DemoBanner />
       <ShellHeader />
       <main id={MAIN_ID} tabIndex={-1} className="mx-auto w-full max-w-6xl px-4 py-8 outline-none">
         {children}

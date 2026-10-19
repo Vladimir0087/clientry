@@ -8,13 +8,13 @@ import { useRef } from 'react';
 import type * as React from 'react';
 
 import { BoardSkeleton, newDealPath, STAGES_PATH, useBoard } from '@/entities/deal';
-import { useSession } from '@/entities/session';
+import { permissionActor, useSession } from '@/entities/session';
 import { BoardAssigneeMenu, useBoardFilters } from '@/features/deal-filters';
 import type { BoardFiltersState } from '@/features/deal-filters';
 import { Button } from '@/shared/ui/button';
 import { PageHeading } from '@/shared/ui/page-heading';
 import { RetryMessage } from '@/shared/ui/retry-message';
-import { hasPermission } from '@clientry/shared/auth';
+import { can } from '@clientry/shared/auth';
 import type { Board } from '@clientry/shared/deals';
 
 import { useFilterSubject } from '../../_lib/use-filter-subject';
@@ -31,7 +31,7 @@ function BoardActions(): React.JSX.Element {
   const session = useSession();
   return (
     <div className="flex flex-wrap gap-2">
-      {session.data !== undefined && hasPermission(session.data.role, 'stages.manage') && (
+      {session.data !== undefined && can(permissionActor(session.data), 'stages.manage') && (
         <Button variant="outline" asChild>
           <Link href={STAGES_PATH}>Edit stages</Link>
         </Button>

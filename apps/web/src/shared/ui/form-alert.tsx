@@ -19,17 +19,19 @@ function isFormControl(element: Element | null): boolean {
 
 interface FormAlertProps {
   readonly alert: FormAlertContent | null;
+  // Off where the caller returns focus to the control that failed; the alert is still announced.
+  readonly shouldFocus?: boolean;
 }
 
-export function FormAlert({ alert }: FormAlertProps): React.JSX.Element | null {
+export function FormAlert({ alert, shouldFocus = true }: FormAlertProps): React.JSX.Element | null {
   const alertRef = useRef<HTMLDivElement>(null);
 
   // The pending submit button lost focus when it was disabled; a field the form focused keeps it.
   useEffect(() => {
-    if (alert !== null && !isFormControl(document.activeElement)) {
+    if (shouldFocus && alert !== null && !isFormControl(document.activeElement)) {
       alertRef.current?.focus();
     }
-  }, [alert]);
+  }, [alert, shouldFocus]);
 
   if (alert === null) {
     return null;

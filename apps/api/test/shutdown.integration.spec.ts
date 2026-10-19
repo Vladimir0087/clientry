@@ -75,7 +75,7 @@ describe('graceful shutdown', () => {
     const { app, http } = await createTestApp({ shouldRunJobs: true });
     await http.get('/health/ready');
     // Each worker holds two connections and each queue one.
-    await expect.poll(countValkeyClients).toBe(7);
+    await expect.poll(countValkeyClients).toBe(10);
 
     await app.close();
 
@@ -116,10 +116,10 @@ describe('graceful shutdown', () => {
     const testApp = await createTestApp({ shouldRunJobs: true, redisUrl });
     try {
       const watcher = new Redis(redisUrl);
-      // Both workers wait for jobs, so their connections are ready.
+      // Every worker waits for jobs, so their connections are ready.
       await expect
         .poll(async () => String(await watcher.client('LIST')).split('cmd=bzpopmin').length - 1)
-        .toBe(2);
+        .toBe(3);
       await watcher.quit();
       await valkey.stop();
       await resetDatabase(testApp.app.get(PrismaService));

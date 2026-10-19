@@ -31,7 +31,7 @@ export function uniqueEmail(prefix = 'user'): string {
   return `${prefix}-${randomUUID()}@studio.dev`;
 }
 
-function toTestAccount(http: Agent, email: string, response: Response): TestAccount {
+export function toTestAccount(http: Agent, email: string, response: Response): TestAccount {
   return {
     http,
     email,

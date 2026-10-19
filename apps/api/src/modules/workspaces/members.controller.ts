@@ -41,12 +41,16 @@ import {
 } from '../../common/http/api-error-response.decorator.js';
 import { ApiProblemResponse } from '../../common/http/api-problem-response.decorator.js';
 import { ResponseSchema } from '../../common/http/response-schema.decorator.js';
-import { AuthenticationRequiredError, InsufficientRoleError } from '../auth/errors.js';
+import {
+  AuthenticationRequiredError,
+  DemoLockedError,
+  InsufficientRoleError,
+} from '../auth/errors.js';
 
 const COLLECTION = '/api/members';
 const ITEM = '/api/members/0199a3c4-6a7b-7c8d-9e0f-1a2b3c4d5e6f';
 
-// One 403 entry for both causes: a second 403 decorator would replace the first.
+// One 403 entry for every cause: a second 403 decorator would replace the first.
 function ManageMembers(instance: string): MethodDecorator {
   return applyDecorators(
     RequirePermission('team.manage'),
@@ -55,6 +59,7 @@ function ManageMembers(instance: string): MethodDecorator {
       instance,
       new UntrustedOriginError(),
       new InsufficientRoleError(),
+      new DemoLockedError(),
     ),
     ApiErrorResponse(HttpStatus.NOT_FOUND, instance, new MemberNotFoundError()),
     ApiErrorResponse(HttpStatus.CONFLICT, instance, new LastOwnerError()),

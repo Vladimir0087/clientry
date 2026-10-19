@@ -6,7 +6,12 @@ import type * as React from 'react';
 import { toast } from 'sonner';
 
 import { inviteKeys, useInvites } from '@/entities/invite';
-import { handleInsufficientRole, sessionKeys, useSession } from '@/entities/session';
+import {
+  handleInsufficientRole,
+  permissionActor,
+  sessionKeys,
+  useSession,
+} from '@/entities/session';
 import { hasErrorCode, isNotFound } from '@/shared/api/api-status';
 import { formatDate } from '@/shared/lib/local-date-time';
 import { GENERIC_MESSAGE } from '@/shared/lib/submit-error';
@@ -25,7 +30,7 @@ import { LocalDate } from '@/shared/ui/local-date';
 import { RetryMessage } from '@/shared/ui/retry-message';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { Spinner } from '@/shared/ui/spinner';
-import { hasPermission } from '@clientry/shared/auth';
+import { can } from '@clientry/shared/auth';
 import { INVITE_LIMITS } from '@clientry/shared/workspaces';
 import type { InviteSummary } from '@clientry/shared/workspaces';
 
@@ -184,7 +189,7 @@ function useRefusedListCheck(error: unknown): void {
 export function PendingInvites(): React.JSX.Element {
   const session = useSession();
   const invites = useInvites({
-    enabled: session.data !== undefined && hasPermission(session.data.role, 'team.manage'),
+    enabled: session.data !== undefined && can(permissionActor(session.data), 'team.manage'),
   });
   useRefusedListCheck(invites.error);
   const headingRef = useRef<HTMLHeadingElement>(null);

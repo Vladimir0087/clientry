@@ -45,9 +45,16 @@ function applyLoginError(
 
 interface LoginFormProps {
   readonly next: string | undefined;
+  // Another way in is pending, so a login now would start a second session.
+  readonly isLocked?: boolean;
+  readonly onPendingChange?: (isPending: boolean) => void;
 }
 
-export function LoginForm({ next }: LoginFormProps): React.JSX.Element {
+export function LoginForm({
+  next,
+  isLocked = false,
+  onPendingChange,
+}: LoginFormProps): React.JSX.Element {
   const form = useForm<LoginRequest>({
     resolver: zodResolver(loginRequestSchema),
     mode: 'onTouched',
@@ -60,9 +67,11 @@ export function LoginForm({ next }: LoginFormProps): React.JSX.Element {
 
   const handleSubmit = form.handleSubmit(async (values) => {
     setAlert(null);
+    onPendingChange?.(true);
     try {
       enterSession(await login.mutateAsync(values));
     } catch (error) {
+      onPendingChange?.(false);
       setAlert(applyLoginError(error, form));
     }
   });
@@ -85,7 +94,11 @@ export function LoginForm({ next }: LoginFormProps): React.JSX.Element {
           {...form.register('password')}
         />
       </FieldGroup>
-      <SubmitButton className="w-full" isSubmitting={isSubmitting || isEntering}>
+      <SubmitButton
+        className="w-full"
+        isSubmitting={isSubmitting || isEntering}
+        isDisabled={isLocked}
+      >
         Log in
       </SubmitButton>
       <AuthSwitchLink prompt="No account?" path={REGISTER_PATH} next={next}>

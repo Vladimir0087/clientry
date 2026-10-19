@@ -108,6 +108,41 @@ describe('TeamView', () => {
     });
   });
 
+  describe('in the demo', () => {
+    const DEMO_LINE =
+      'Inviting people, changing roles, removing members and renaming the workspace are turned off in the demo.';
+
+    function demoSession(role: SessionResponse['role']): SessionResponse {
+      return {
+        ...TEST_SESSION,
+        workspace: { ...TEST_SESSION.workspace, isDemo: true },
+        role,
+      };
+    }
+
+    it('should show the demo line without owner controls or an invites request when the demo owner opens the page', async () => {
+      session = demoSession('owner');
+      renderTeam();
+
+      expect(await screen.findByText(DEMO_LINE)).toBeInTheDocument();
+      await screen.findAllByText('Max Kim');
+      expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Pending invites' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Rename' })).not.toBeInTheDocument();
+      expect(inviteRequests).toHaveLength(0);
+    });
+
+    it('should keep the owners-only line when the viewer is the demo manager', async () => {
+      session = demoSession('manager');
+      renderTeam();
+
+      expect(
+        await screen.findByText('Only owners can invite people and change roles.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(DEMO_LINE)).not.toBeInTheDocument();
+    });
+  });
+
   describe('roles', () => {
     it('should promote without a confirmation and say so when Make owner is chosen', async () => {
       const patches = answerPatch(MAX.id, () => HttpResponse.json({ ...MAX, role: 'owner' }));
@@ -616,9 +651,10 @@ describe('TeamView', () => {
       await user.click(screen.getByRole('button', { name: 'Save' }));
 
       expect(await screen.findByText('Workspace renamed')).toBeInTheDocument();
-      expect(queryClient.getQueryData<SessionResponse>(sessionKeys.current)?.workspace).toEqual(
-        renamed,
-      );
+      expect(queryClient.getQueryData<SessionResponse>(sessionKeys.current)?.workspace).toEqual({
+        ...renamed,
+        isDemo: false,
+      });
       expect(screen.getByText('Pixel Lab')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Rename' })).toHaveFocus();
       expect(meRequests).toHaveLength(1);
@@ -627,7 +663,7 @@ describe('TeamView', () => {
     it('should keep the new name and ask for the session again when a refetch was in flight during the rename', async () => {
       const renamed = { id: TEST_SESSION.workspace.id, name: 'Pixel Lab' };
       recordRequests('patch', '/api/workspace', () => {
-        session = { ...TEST_SESSION, workspace: renamed };
+        session = { ...TEST_SESSION, workspace: { ...renamed, isDemo: false } };
         return HttpResponse.json(renamed);
       });
       const user = userEvent.setup();
@@ -659,9 +695,10 @@ describe('TeamView', () => {
       await waitFor(() => {
         expect(queryClient.isFetching({ queryKey: sessionKeys.current })).toBe(0);
       });
-      expect(queryClient.getQueryData<SessionResponse>(sessionKeys.current)?.workspace).toEqual(
-        renamed,
-      );
+      expect(queryClient.getQueryData<SessionResponse>(sessionKeys.current)?.workspace).toEqual({
+        ...renamed,
+        isDemo: false,
+      });
     });
   });
 });

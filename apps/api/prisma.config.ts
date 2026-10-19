@@ -11,7 +11,11 @@ if (existsSync(ROOT_ENV_FILE)) {
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',
-  migrations: { path: 'prisma/migrations' },
+  // The built seed: the sources import .js paths, which Node cannot run as TypeScript.
+  migrations: {
+    path: 'prisma/migrations',
+    seed: 'node --env-file-if-exists=../../.env dist/demo-seed.js',
+  },
   // Not env(): it throws when the variable is missing, and generate needs no database.
   datasource: { url: process.env.DATABASE_URL },
 });

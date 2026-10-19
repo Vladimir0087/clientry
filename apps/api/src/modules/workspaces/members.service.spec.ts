@@ -21,6 +21,7 @@ const OWNER: AuthUser = {
   id: '0199a3c4-5e6f-7a8b-9c0d-1e2f3a4b5c6d',
   workspaceId: WORKSPACE_ID,
   role: 'owner',
+  isDemo: false,
 };
 
 function member(id: string, name: string, role: Member['role']): Member {

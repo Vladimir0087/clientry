@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
-import { LoginForm } from '@/features/auth';
+import { LoginView } from '@/features/auth';
 import { NEXT_PARAM } from '@/shared/lib/redirect-target';
 import { CardContent, CardHeader } from '@/shared/ui/card';
 
@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>): 
         <h1 className="text-lg font-semibold">Log in to Clientry</h1>
       </CardHeader>
       <CardContent>
-        <LoginForm next={typeof next === 'string' ? next : undefined} />
+        <LoginView next={typeof next === 'string' ? next : undefined} />
       </CardContent>
     </>
   );

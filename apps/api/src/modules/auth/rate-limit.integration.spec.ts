@@ -97,4 +97,17 @@ describe('auth rate limit', () => {
 
     expect(response.status).toBe(429);
   });
+
+  // Counted whether the demo exists or not: 200 and 503 both reach the throttler.
+  it('should answer 429 when the 11th demo entry comes within a minute', async () => {
+    const app = await startApp(0);
+    const http = agent(app.app.getHttpServer());
+    for (let attempt = 0; attempt < LOGIN_LIMIT; attempt += 1) {
+      await http.post('/api/auth/demo').send({ role: 'owner' });
+    }
+
+    const response = await http.post('/api/auth/demo').send({ role: 'owner' });
+
+    expect(response.status).toBe(429);
+  });
 });

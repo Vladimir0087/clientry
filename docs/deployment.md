@@ -375,22 +375,33 @@ caps throughput anyway.
 
 The API runs its BullMQ workers in the same process (ADR 0012): `reminders` delivers task reminders
 and sweeps for missing ones every hour; `sessions` purges sessions past their absolute end once a
-day. A clock in the process adds the recurring jobs every 5 minutes, so nothing needs setting up on
-Render and a Valkey restart loses nothing that the next tick does not bring back.
+day; `demo` rebuilds the shared demo workspace once a day (ADR 0016). A clock in the process adds
+the recurring jobs every 5 minutes, so nothing needs setting up on Render and a Valkey restart loses
+nothing that the next tick does not bring back.
 
-**Connections.** Seven Valkey connections of the 50 Render Key Value allows: the readiness probe,
-one per queue (two) and two per worker (four). Queues fail an add within seconds while Valkey is
+**Demo reset.** The first tick against a Valkey without the job's deduplication key resets the
+demo at once: after a deploy that brings the job, after Valkey loses its data, and on a new
+database, where it creates the demo. Then once a day; the time of day drifts by up to one tick per
+day. Each reset logs `Demo workspace reset` with the counts and the duration; a failed one is
+retried three times and logged as a failed job, and the previous demo stays as it was. Until the
+first reset the demo button answers 503 `DEMO_UNAVAILABLE`. `pnpm --filter @clientry/api db:seed`
+runs one reset against the database in `DATABASE_URL` without the worker, for a local database.
+
+**Connections.** Ten Valkey connections of the 50 Render Key Value allows: the readiness probe,
+one per queue (three) and two per worker (six). Queues fail an add within seconds while Valkey is
 down, and the write that triggered it still succeeds; workers wait the outage out.
 
 **Neon budget.** An idle API touches Postgres only through the hourly sweep, which keeps Neon awake
 for its 5 minutes: about 62 hours a month, 15.5 of the 100 CU-hours at 0.25 CU. The daily session
-purge adds one wake a day when it misses the sweep's, about 2.5 hours a month more. Ticks, waiting
-workers and delayed jobs touch Valkey only.
+purge and the daily demo reset each add one wake a day when they miss the sweep's, about 2.5 hours
+a month more each. Ticks, waiting workers and delayed jobs touch Valkey only. The demo's rows take
+well under 1 MB of the 1 GB; what visitors add lives a day at most.
 
 **Netlify budget.** The bell polls the unread count once a minute through the `/api/*` rewrite, one
 function invocation each: 60 per hour of an active, visible tab, so the 125k a month allow about
 2 000 such tab-hours with nothing else counted. Polling stops in a hidden tab and after 15 minutes
-without input. The count the layout prefetches goes to the API directly and costs no invocation.
+without input. The count the layout prefetches goes to the API directly and costs no invocation. A
+press of the demo button is one invocation.
 
 **Memory check.** A day after a deploy that changes the workers, Render's memory graph for the API
 should stay under 450 MB of the 512 MB, and Neon's monitoring should show compute suspended between

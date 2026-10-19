@@ -18,6 +18,7 @@ const OWNER: AuthUser = {
   id: '0199a3c4-5e6f-7a8b-9c0d-1e2f3a4b5c6d',
   workspaceId: '0199a3c4-5e70-7b1c-8d2e-3f4a5b6c7d8e',
   role: 'owner',
+  isDemo: false,
 };
 
 const INVITE_ID = '0199b0d2-1a2b-7c3d-8e4f-5a6b7c8d9e0f';

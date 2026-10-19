@@ -3,6 +3,7 @@ import type { MemberRole } from '@clientry/shared/auth';
 export interface Membership {
   readonly workspaceId: string;
   readonly role: MemberRole;
+  readonly isDemo: boolean;
 }
 
 export interface StoredRefreshToken {

@@ -6,6 +6,7 @@ export interface AuthUser {
   readonly id: string;
   readonly workspaceId: string;
   readonly role: MemberRole;
+  readonly isDemo: boolean;
 }
 
 // A WeakMap rather than a request property: no global Express type augmentation is needed.

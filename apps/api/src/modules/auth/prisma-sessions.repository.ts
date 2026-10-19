@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import type { MemberRole } from '@clientry/shared/auth';
+
 import type {
   LiveSessionLookup,
   Membership,
@@ -9,6 +11,12 @@ import type {
   TokenRotation,
 } from './sessions.repository.js';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
+
+interface LiveMembershipRow {
+  readonly workspace_id: string;
+  readonly role: MemberRole;
+  readonly is_demo: boolean;
+}
 
 @Injectable()
 export class PrismaSessionsRepository implements SessionsRepository {
@@ -31,15 +39,23 @@ export class PrismaSessionsRepository implements SessionsRepository {
     });
   }
 
-  // One statement: the membership row with an EXISTS check on the session's primary key.
-  findLiveMembership({ userId, sessionId, now }: LiveSessionLookup): Promise<Membership | null> {
-    return this.prisma.membership.findFirst({
-      where: {
-        userId,
-        user: { sessions: { some: { id: sessionId, revokedAt: null, expiresAt: { gt: now } } } },
-      },
-      select: { workspaceId: true, role: true },
-    });
+  // One statement: the membership with its workspace's demo flag and an EXISTS check on the
+  // session's primary key. Prisma would load the workspace relation with a second query.
+  async findLiveMembership({
+    userId,
+    sessionId,
+    now,
+  }: LiveSessionLookup): Promise<Membership | null> {
+    const [row] = await this.prisma.$queryRaw<LiveMembershipRow[]>`
+      SELECT m.workspace_id, m.role, w.is_demo
+      FROM memberships m
+      JOIN workspaces w ON w.id = m.workspace_id
+      WHERE m.user_id = ${userId}::uuid
+        AND EXISTS (
+          SELECT 1 FROM sessions s
+          WHERE s.id = ${sessionId}::uuid AND s.user_id = m.user_id
+            AND s.revoked_at IS NULL AND s.expires_at > ${now})`;
+    return row ? { workspaceId: row.workspace_id, role: row.role, isDemo: row.is_demo } : null;
   }
 
   async deleteEndedSessions(userId: string, now: Date): Promise<void> {

@@ -83,6 +83,20 @@ describe('StageManager', () => {
     expect(screen.queryByLabelText('New stage')).not.toBeInTheDocument();
   });
 
+  it('should keep the controls when the viewer is the owner of the demo', async () => {
+    recordRequests('get', '/api/auth/me', () =>
+      HttpResponse.json({
+        ...TEST_SESSION,
+        workspace: { ...TEST_SESSION.workspace, isDemo: true },
+      }),
+    );
+    renderManager();
+
+    expect(await screen.findByRole('button', { name: 'Move Call up' })).toBeEnabled();
+    expect(screen.getByLabelText('New stage')).toBeEnabled();
+    expect(screen.queryByText('Only owners can change stages.')).not.toBeInTheDocument();
+  });
+
   it('should focus the Stages heading when Try again reloads the stages', async () => {
     recordRequests('get', '/api/stages', failOnceThenWait(TEST_STAGES));
     const user = userEvent.setup();

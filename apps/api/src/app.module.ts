@@ -18,6 +18,7 @@ import { PermissionsGuard } from './modules/auth/permissions.guard.js';
 import { ClientsModule } from './modules/clients/clients.module.js';
 import { DashboardModule } from './modules/dashboard/dashboard.module.js';
 import { DealsModule } from './modules/deals/deals.module.js';
+import { DemoModule } from './modules/demo/demo.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { TasksModule } from './modules/tasks/tasks.module.js';
@@ -44,6 +45,7 @@ export class AppModule {
         ClientsModule,
         DashboardModule,
         DealsModule,
+        DemoModule,
         HealthModule,
         NotificationsModule,
         TasksModule,

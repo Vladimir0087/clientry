@@ -5,7 +5,7 @@ import { memberRoleSchema } from './member-role.js';
 export const sessionResponseSchema = z
   .object({
     user: z.object({ id: z.uuid(), email: z.email(), name: z.string() }),
-    workspace: z.object({ id: z.uuid(), name: z.string() }),
+    workspace: z.object({ id: z.uuid(), name: z.string(), isDemo: z.boolean() }),
     role: memberRoleSchema,
   })
   .meta({ id: 'SessionResponse' });
