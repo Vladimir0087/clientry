@@ -9,6 +9,7 @@ import { LOGIN_PATH } from '@/shared/lib/redirect-target';
 export function useLogout(): UseMutationResult<void, Error, void> {
   return useMutation({
     mutationFn: () => logout(),
+    meta: { isSessionEnd: true },
     onSuccess: () => {
       replaceLocation(LOGIN_PATH);
     },

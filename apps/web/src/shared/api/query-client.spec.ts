@@ -99,6 +99,19 @@ describe('createQueryClient', () => {
     expect(mutationFn).toHaveBeenCalledTimes(1);
   });
 
+  it('should skip the mutation-success hook when a mutation that ends the session succeeds', async () => {
+    const onMutationSuccess = vi.fn();
+    const queryClient = createQueryClient({ onMutationSuccess });
+    const mutation = queryClient.getMutationCache().build(queryClient, {
+      mutationFn: () => Promise.resolve(),
+      meta: { isSessionEnd: true },
+    });
+
+    await mutation.execute(undefined);
+
+    expect(onMutationSuccess).not.toHaveBeenCalled();
+  });
+
   it('should call the session-expired handler once when two queries and a mutation fail at once', async () => {
     const onSessionExpired = vi.fn();
     const queryClient = createQueryClient({ onSessionExpired });

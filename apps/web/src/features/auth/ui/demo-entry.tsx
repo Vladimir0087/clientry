@@ -70,7 +70,7 @@ export function DemoEntry({ next, isLocked, onPendingChange }: DemoEntryProps): 
       <h2 id={headingId} className="text-sm font-semibold">
         Just looking around?
       </h2>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm">
         Explore a sample web studio with clients, deals and tasks already in place. No sign-up
         needed.
       </p>

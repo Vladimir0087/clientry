@@ -12,6 +12,8 @@ out/
 coverage/
 playwright-report/
 test-results/
+# server output of the e2e stack
+apps/e2e/.logs/
 
 # env and secrets
 .env

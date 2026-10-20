@@ -23,9 +23,9 @@ flowchart LR
 - The browser talks to the Netlify origin only; Next rewrites `/api/*` to the API.
 - Netlify's server function, the API, Valkey and Postgres share one region, Ohio: the function's
   region is fixed on the free plan, so the rest follows it.
-- Every push to `main` runs CI; after `lint`, `typecheck`, `test` and `image` pass, `deploy-api`
-  deploys the tested image digest to Render, then `deploy-web` builds the web and deploys it to
-  Netlify. Neither host is connected to the repository.
+- Every push to `main` runs CI; after `lint`, `typecheck`, `test`, `e2e` and `image` pass,
+  `deploy-api` deploys the tested image digest to Render, then `deploy-web` builds the web, deploys
+  it to Netlify and checks the live site. Neither host is connected to the repository.
 
 ## Live
 
@@ -279,6 +279,17 @@ While the value is `0`, every visitor shares one rate-limit bucket.
 
 Merging to `main` deploys by itself. `/health/live` on the API reports the live commit as
 `version`.
+
+Nothing deploys unless the end-to-end scenarios pass: `deploy-api` needs the `e2e` job as well as
+the other checks ([testing](testing.md)). After the web deploy, `deploy-web` runs `smoke-live.sh`,
+then a read-only tour of the live demo in Chromium (`pnpm --filter @clientry/e2e e2e:live` against
+the `WEB_PUBLIC_URL` variable): `/login` renders, "Explore the demo" opens a filled dashboard, the
+board has cards, the notification bell shows, and logging out returns to `/login`. The bell's
+count is not checked: visitors may have read every notification. The tour writes nothing but its
+own session, which the logout ends. Either check failing fails the run; the new version is live by
+then, so a failure means looking at the site and rolling back if it is broken. A failed tour leaves
+its trace in the run's `live-tour-trace` artifact. The tour retries twice for a cold function or a
+waking API and costs a few dozen Netlify function invocations per deploy.
 
 ### Redeploy, or ship a changed variable
 

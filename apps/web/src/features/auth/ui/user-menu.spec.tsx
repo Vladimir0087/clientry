@@ -1,10 +1,11 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { sessionKeys } from '@/entities/session';
 import { createQueryClient } from '@/shared/api/query-client';
+import type { QueryClientOptions } from '@/shared/api/query-client';
 import { replaceLocation } from '@/shared/lib/navigation';
 
 import { UserMenu } from './user-menu';
@@ -12,8 +13,8 @@ import { TEST_SESSION } from '../../../../test/fixtures';
 import { recordRequests } from '../../../../test/msw/record';
 import { renderWithProviders } from '../../../../test/render';
 
-function renderSignedIn(): void {
-  const queryClient = createQueryClient();
+function renderSignedIn(options: QueryClientOptions = {}): void {
+  const queryClient = createQueryClient(options);
   queryClient.setQueryData(sessionKeys.current, TEST_SESSION);
   renderWithProviders(<UserMenu />, queryClient);
 }
@@ -49,6 +50,20 @@ describe('UserMenu', () => {
       expect(replaceLocation).toHaveBeenCalledWith('/login');
     });
     expect(logouts).toHaveLength(1);
+  });
+
+  it('should skip the mutation-success hook when Log out succeeds', async () => {
+    recordRequests('post', '/api/auth/logout', () => new HttpResponse(null, { status: 204 }));
+    const onMutationSuccess = vi.fn();
+    renderSignedIn({ onMutationSuccess });
+    await openMenu();
+
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Log out' }));
+
+    await waitFor(() => {
+      expect(replaceLocation).toHaveBeenCalledWith('/login');
+    });
+    expect(onMutationSuccess).not.toHaveBeenCalled();
   });
 
   it('should toast and stay when the logout fails', async () => {

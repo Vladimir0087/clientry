@@ -18,6 +18,12 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    // Never cached: the result depends on Docker and the clock.
+    "e2e": {
+      "dependsOn": ["^build", "@clientry/api#build", "@clientry/web#build"],
+      "cache": false,
+      "passThroughEnv": ["CI"]
     }
   }
 }
