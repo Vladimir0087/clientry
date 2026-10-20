@@ -51,6 +51,31 @@ jobs:
       - run: pnpm build
       - run: pnpm test
 
+  # The plan's scenarios in Chromium against production builds of the web and the API.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      # Not cached, as Playwright's CI guide advises: the system packages install either way, and
+      # restoring the browser takes as long as downloading it.
+      - run: pnpm --filter @clientry/e2e exec playwright install --with-deps --only-shell chromium
+
+      - run: pnpm e2e
+
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            apps/e2e/playwright-report
+            apps/e2e/test-results
+            apps/e2e/.logs
+          include-hidden-files: true
+          retention-days: 7
+
   image:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -108,7 +133,7 @@ jobs:
           echo "digest=${reference#*@}" >> "$GITHUB_OUTPUT"
 
   deploy-api:
-    needs: [lint, typecheck, test, image]
+    needs: [lint, typecheck, test, e2e, image]
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -173,3 +198,18 @@ jobs:
         env:
           WEB_PUBLIC_URL: ${{ vars.WEB_PUBLIC_URL }}
           API_PUBLIC_URL: ${{ vars.API_PUBLIC_URL }}
+
+      - run: pnpm --filter @clientry/e2e exec playwright install --with-deps --only-shell chromium
+
+      # A read-only tour of the live demo; its own session ends with its logout.
+      - id: live-tour
+        run: pnpm --filter @clientry/e2e e2e:live
+        env:
+          WEB_PUBLIC_URL: ${{ vars.WEB_PUBLIC_URL }}
+
+      - if: failure() && steps.live-tour.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-tour-trace
+          path: apps/e2e/test-results
+          retention-days: 7
