@@ -16,7 +16,7 @@ test.describe('auth', () => {
     await page.getByRole('button', { name: 'Create account' }).click();
 
     await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
-    await page.getByRole('button', { name: 'Account' }).click();
+    await page.getByRole('button', { name: 'Account', exact: true }).click();
     await expect(page.getByRole('menu')).toContainText('Rita Rivers');
   });
 
@@ -68,7 +68,7 @@ test.describe('auth', () => {
 
     expect((await refreshed).status()).toBe(200);
     await expect(page.getByText('No clients yet')).toBeVisible();
-    await page.getByRole('button', { name: 'Account' }).click();
+    await page.getByRole('button', { name: 'Account', exact: true }).click();
     await expect(page.getByRole('menu')).toContainText(owner.user.name);
     expect(requests.filter(({ path }) => path === '/api/auth/refresh')).toHaveLength(1);
   });
@@ -81,7 +81,7 @@ test.describe('auth', () => {
     await page.goto('/clients');
     await expect(page.getByRole('heading', { level: 1, name: 'Clients' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Account' }).click();
+    await page.getByRole('button', { name: 'Account', exact: true }).click();
     await expect(page.getByRole('menu')).toContainText(owner.user.email);
     await page.getByRole('menuitem', { name: 'Log out' }).click();
     await expect(page).toHaveURL(/\/login$/);
@@ -100,7 +100,7 @@ test.describe('auth', () => {
     await expect(page.getByText('No deals won in the last 6 months.')).toBeVisible();
     const requests = recordApiRequests(page);
 
-    await page.getByRole('button', { name: 'Account' }).click();
+    await page.getByRole('button', { name: 'Account', exact: true }).click();
     await expect(page.getByRole('menu')).toContainText(owner.user.email);
     const loggedOut = page.waitForResponse('**/api/auth/logout');
     await page.getByRole('menuitem', { name: 'Log out' }).click();

@@ -23,7 +23,7 @@ test.describe('live demo tour', () => {
       .click();
     await expect(page.getByRole('button', { name: /^Drag / }).first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Account' }).click();
+    await page.getByRole('button', { name: 'Account', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Log out' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Log in to Clientry' })).toBeVisible();
   });
