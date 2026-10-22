@@ -132,11 +132,17 @@ export function joinByInvite(
   return send(request, 'POST', '/api/auth/invite/register', sessionResponseSchema, body);
 }
 
-export async function firstClientId(request: APIRequestContext): Promise<string> {
-  const { items } = await send(request, 'GET', '/api/clients?limit=1', clientListResponseSchema);
+// The newest client, or the first one the search finds.
+export async function firstClientId(request: APIRequestContext, search?: string): Promise<string> {
+  const query = new URLSearchParams({ limit: '1' });
+  if (search !== undefined) {
+    query.set('q', search);
+  }
+  const path = `/api/clients?${query.toString()}`;
+  const { items } = await send(request, 'GET', path, clientListResponseSchema);
   const [client] = items;
   if (client === undefined) {
-    throw new ArrangeError('The workspace has no clients');
+    throw new ArrangeError(`${path} found no client`);
   }
   return client.id;
 }

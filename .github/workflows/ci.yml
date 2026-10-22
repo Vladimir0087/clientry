@@ -4,7 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
-  # Deploys the chosen branch; with deploy off it only publishes the image.
+  # Deploys only from main: the production environment refuses any other branch at deploy-api.
+  # With deploy off, a run of any branch only publishes its image.
   workflow_dispatch:
     inputs:
       deploy:
@@ -137,6 +138,8 @@ jobs:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Holds the deploy secrets and takes deployments from main only.
+    environment: production
     # A running deploy always finishes; a newer waiting one replaces an older waiting one.
     concurrency:
       group: deploy-api
@@ -172,6 +175,10 @@ jobs:
     needs: deploy-api
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # The repository page links this URL under Deployments.
+    environment:
+      name: production
+      url: ${{ vars.WEB_PUBLIC_URL }}
     concurrency:
       group: deploy-web
       cancel-in-progress: false

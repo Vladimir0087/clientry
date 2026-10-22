@@ -35,8 +35,7 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.json
 
-# hidden until the live demo is ready
-/README.md
+# internal notes, never published
 docs/PLAN.md
 docs/FLOW.md
 CLAUDE.md

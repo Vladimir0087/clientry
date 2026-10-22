@@ -24,6 +24,11 @@
       "dependsOn": ["^build", "@clientry/api#build", "@clientry/web#build"],
       "cache": false,
       "passThroughEnv": ["CI"]
+    },
+    // Writes docs/media outside the package, so there is nothing to cache.
+    "media": {
+      "dependsOn": ["^build", "@clientry/api#build", "@clientry/web#build"],
+      "cache": false
     }
   }
 }

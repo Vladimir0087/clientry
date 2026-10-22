@@ -2,23 +2,26 @@
 
 How Clientry runs on free hosting (stage 1) and how to set it up, deploy, roll back and rotate
 secrets. Decisions and their reasons are in [ADR 0008](adr/0008-deployment.md), for the web on
-Netlify in [ADR 0011](adr/0011-web-on-netlify.md), and for the region in
-[ADR 0015](adr/0015-backend-in-ohio.md).
+Netlify in [ADR 0011](adr/0011-web-on-netlify.md), for the region in
+[ADR 0015](adr/0015-backend-in-ohio.md), and for the public repository, its ruleset and the
+`production` environment in [ADR 0018](adr/0018-public-repository.md).
 
 ## Topology
 
 ```mermaid
 flowchart LR
-  browser[Browser] --> netlify["Netlify (web: edge near the visitor, functions in Ohio)"]
-  netlify -- "/api/* rewrite" --> render["Render web service (api, Ohio)"]
-  render --> neon[("Neon Postgres (us-east-2)")]
-  render --> valkey[("Render Key Value (Ohio)")]
-  pinger[UptimeRobot] -- "/health/live" --> render
-  ci[GitHub Actions] -- "image digest via deploy hook" --> render
-  ci -- "netlify deploy" --> netlify
-  ci -- "push" --> ghcr[(GHCR)]
-  render -- "pull" --> ghcr
+  browser[Browser] -->|"pages and /api/*"| web["Web on Netlify<br>edge near the visitor, functions in Ohio"]
+  web -->|"/api/* rewrite"| api["API and worker on Render<br>Ohio"]
+  api -->|"SQL"| neon[("Postgres on Neon<br>us-east-2")]
+  api -->|"queues and timers"| valkey[("Valkey on Render Key Value<br>Ohio")]
+  pinger[UptimeRobot] -->|"/health/live every 5 min"| api
+  ci[GitHub Actions] ==>|"tested image"| ghcr[(GHCR)]
+  ghcr ==>|"image by digest"| api
+  ci ==>|"deploy hook with the digest"| api
+  ci ==>|"build and deploy"| web
 ```
+
+Thin arrows are requests at runtime, thick ones are deploys from CI.
 
 - The browser talks to the Netlify origin only; Next rewrites `/api/*` to the API.
 - Netlify's server function, the API, Valkey and Postgres share one region, Ohio: the function's
@@ -26,6 +29,8 @@ flowchart LR
 - Every push to `main` runs CI; after `lint`, `typecheck`, `test`, `e2e` and `image` pass,
   `deploy-api` deploys the tested image digest to Render, then `deploy-web` builds the web, deploys
   it to Netlify and checks the live site. Neither host is connected to the repository.
+- Both deploy jobs run in the GitHub environment `production`, which holds the deploy secrets and
+  takes deployments from `main` only.
 
 ## Live
 
@@ -40,13 +45,13 @@ Filled in at setup. Names may carry a suffix where the plain one is taken.
 | Render Key Value     | `clientry-valkey`, Ohio                                                                                                   |
 | Neon project         | `clientry` (`rapid-butterfly-67544866`), AWS `us-east-2`, branch `production`, database `clientry`, role `clientry_owner` |
 | Netlify site         | `clientry` (`cfb430c6-8fbe-4e69-8c71-d7c45ef6b780`), team on the legacy Free plan                                         |
-| Image                | `ghcr.io/vladimir0087/clientry-api` (private)                                                                             |
+| Image                | `ghcr.io/vladimir0087/clientry-api` (public)                                                                              |
 | UptimeRobot monitors | API liveness, web login                                                                                                   |
 | `TRUST_PROXY_HOPS`   | `5`, measured on 2026-10-11, again after the move to Ohio on 2026-10-18                                                   |
 
 ## Consoles
 
-All accounts are the owner's personal ones (personal email, not a work address).
+All accounts are the owner's.
 
 | Service                      | Console                                                                       |
 | ---------------------------- | ----------------------------------------------------------------------------- |
@@ -56,8 +61,9 @@ All accounts are the owner's personal ones (personal email, not a work address).
 | Netlify tokens               | https://app.netlify.com/user/applications#personal-access-tokens              |
 | GHCR package                 | https://github.com/users/Vladimir0087/packages/container/package/clientry-api |
 | GitHub Actions               | https://github.com/Vladimir0087/clientry/actions                              |
-| GitHub secrets               | https://github.com/Vladimir0087/clientry/settings/secrets/actions             |
-| GitHub tokens (classic)      | https://github.com/settings/tokens                                            |
+| GitHub variables             | https://github.com/Vladimir0087/clientry/settings/variables/actions           |
+| GitHub environments          | https://github.com/Vladimir0087/clientry/settings/environments                |
+| GitHub rulesets              | https://github.com/Vladimir0087/clientry/settings/rules                       |
 | GitHub tokens (fine-grained) | https://github.com/settings/personal-access-tokens                            |
 | GitHub installed apps        | https://github.com/settings/installations                                     |
 | UptimeRobot                  | https://dashboard.uptimerobot.com                                             |
@@ -114,7 +120,11 @@ time.
 
 GitHub → Actions → CI → Run workflow, on the branch being set up, with **deploy unchecked**. The
 `image` job publishes `ghcr.io/vladimir0087/clientry-api:latest` and `:sha-<commit>`. The
-package is linked to the repository by the image's source label and stays private.
+package is linked to the repository by the image's source label and starts private: on the
+package's page, Package settings → Danger Zone → Change visibility → **Public**. This is one-way:
+GitHub never makes a public package private again. Render pulls a public image without a registry
+credential. The image holds the built API and its production dependencies; secrets reach it only
+at runtime.
 
 GitHub shows the Run workflow button only once `main` has a workflow with `workflow_dispatch`.
 Before the first merge, dispatch through the REST API with a fine-grained token limited to this
@@ -128,16 +138,10 @@ Invoke-RestMethod -Method Post -Headers $headers -Body $body `
   -Uri 'https://api.github.com/repos/Vladimir0087/clientry/actions/workflows/ci.yml/dispatches'
 ```
 
-No output means GitHub accepted it; the run appears under Actions. `"deploy":"true"` deploys.
+No output means GitHub accepted it; the run appears under Actions. `"deploy":"true"` deploys from
+the ref `main` only: the `production` environment refuses any other.
 
-### 5. Registry credential for Render
-
-GitHub → Settings → Developer settings → Personal access tokens → **Tokens (classic)**, scope
-`read:packages` only, expiring in one year (fine-grained tokens cannot read packages). In Render →
-Workspace settings → Registry credentials, add it for `ghcr.io` with username `Vladimir0087`.
-Write the expiry date into [Expiry and rotation](#expiry-and-rotation).
-
-### 6. Netlify site
+### 5. Netlify site
 
 The owner's existing Netlify account, signed in with GitHub. Its team is on the legacy Free plan:
 Usage & billing → Plan details shows "Free plan" with build minutes and bandwidth, no credits.
@@ -168,7 +172,7 @@ pauses every site when the month's credits run out.
    the same value in every deploy context, every scope. Neither is a secret, and `API_URL` is
    baked into the build output, which Netlify's secret scanning rejects for a secret variable.
    - `API_URL`: the Render origin, `https://clientry-api-ohio.onrender.com`, no trailing slash.
-     Filled in after step 7, then redeployed.
+     Filled in after step 6, then redeployed.
    - `JWT_PUBLIC_KEY`: the public line from step 1, everything after `JWT_PUBLIC_KEY=`.
 5. Project configuration → General → **Powered by Netlify badge**: off. New Free projects get it
    on, and its injected script carries no nonce, so the CSP blocks it and `smoke-live.sh` fails.
@@ -178,11 +182,11 @@ pauses every site when the month's credits run out.
 
 The site's origin `https://clientry.netlify.app` is the web origin from now on.
 
-### 7. Render web service
+### 6. Render web service
 
 New → Web Service → Existing image:
 
-- image `ghcr.io/vladimir0087/clientry-api:latest` with the credential from step 5;
+- image `ghcr.io/vladimir0087/clientry-api:latest`, no credential: the package is public (step 4);
 - region Ohio, instance type Free, no disk;
 - health check path `/health/live`, **not** `/health/ready`: Render probes it continuously, and a
   probe that queries Postgres would keep Neon awake and spend its compute budget in under three
@@ -205,32 +209,39 @@ Environment:
 `PORT` is Render's own and `APP_VERSION` is baked into the image; neither is set here.
 
 Then Settings → Deploy hook: copy the URL. It is `RENDER_DEPLOY_HOOK_URL`, and anyone holding it
-can deploy, so it lives only in GitHub secrets.
+can deploy, so it lives only in the GitHub environment of step 7.
 
-Set `API_URL` on Netlify (step 6) to this service's origin.
+Set `API_URL` on Netlify (step 5) to this service's origin.
 
-### 8. GitHub secrets and variables
+### 7. GitHub environment, secrets and variables
 
-Repository → Settings → Secrets and variables → Actions, at repository level (a private repository
-on the free plan has no environments; they move to a `production` environment once the repository
-is public).
+Repository → Settings → Environments → New environment `production`:
 
-| Name                     | Kind     | Value                                    |
-| ------------------------ | -------- | ---------------------------------------- |
-| `RENDER_DEPLOY_HOOK_URL` | secret   | step 7                                   |
-| `NETLIFY_AUTH_TOKEN`     | secret   | step 6                                   |
-| `NETLIFY_SITE_ID`        | variable | step 6                                   |
-| `API_PUBLIC_URL`         | variable | `https://clientry-api-ohio.onrender.com` |
-| `WEB_PUBLIC_URL`         | variable | `https://clientry.netlify.app`           |
+- Deployment branches and tags: **Selected branches and tags**, one rule for the branch `main`.
+  A run of any other branch is refused when a job enters the environment.
+- No required reviewers and no wait timer: a merge deploys by itself.
+- Environment secrets: the two below. Only `deploy-api` and `deploy-web` run in the environment, so
+  no other job, and no other branch, reads them.
 
-### 9. First deploy
+Repository → Settings → Secrets and variables → Actions → Variables, at repository level: none of
+them is a secret.
 
-Actions → CI → Run workflow on the branch, deploy checked. `deploy-api` deploys the digest and
-waits for `/health/live` to report the commit; `deploy-web` builds the web with Netlify's CLI,
-publishes it and runs `smoke-live.sh`. The site's Deploys list shows the commit as each deploy's
-message.
+| Name                     | Kind                | Value                                    |
+| ------------------------ | ------------------- | ---------------------------------------- |
+| `RENDER_DEPLOY_HOOK_URL` | `production` secret | step 6                                   |
+| `NETLIFY_AUTH_TOKEN`     | `production` secret | step 5                                   |
+| `NETLIFY_SITE_ID`        | repository variable | step 5                                   |
+| `API_PUBLIC_URL`         | repository variable | `https://clientry-api-ohio.onrender.com` |
+| `WEB_PUBLIC_URL`         | repository variable | `https://clientry.netlify.app`           |
 
-### 10. UptimeRobot
+### 8. First deploy
+
+Actions → CI → Run workflow on `main`, deploy checked. `deploy-api` deploys the digest and waits
+for `/health/live` to report the commit; `deploy-web` builds the web with Netlify's CLI, publishes
+it and runs `smoke-live.sh`. The site's Deploys list shows the commit as each deploy's message, and
+the repository page lists the deployment to `production` with the web's URL.
+
+### 9. UptimeRobot
 
 Two HTTP(S) monitors, 5-minute interval, no notifications (the email alert contact is unchecked
 on both); their status is visible in the dashboard:
@@ -256,8 +267,8 @@ what it does to `X-Forwarded-For`, so the hops are measured; a host change means
    client. On 2026-10-11 the chain was the browser, Netlify's edge (Frankfurt, near a European
    browser), Netlify's function (Ohio), Cloudflare in front of Render, and Render's own proxy: `5`.
    After the move to Ohio on 2026-10-18 it was the same five hops.
-4. Set it in Render's environment with **Save only**, then redeploy through a manual CI run of the
-   live branch (see [Redeploy](#redeploy-or-ship-a-changed-variable)).
+4. Set it in Render's environment with **Save only**, then redeploy through a manual CI run on
+   `main` (see [Redeploy](#redeploy-or-ship-a-changed-variable)).
 5. Log in again: `clientIp` must be the browser's public address. Ten wrong passwords within a
    minute lead to the 429 alert on the eleventh, and a login from another network (a phone on
    mobile data) still works right after.
@@ -278,7 +289,8 @@ While the value is `0`, every visitor shares one rate-limit bucket.
 ### Deploy
 
 Merging to `main` deploys by itself. `/health/live` on the API reports the live commit as
-`version`.
+`version`. `deploy-api` and `deploy-web` run in the `production` environment, and the repository
+page lists each deployment under Deployments with the web's URL.
 
 Nothing deploys unless the end-to-end scenarios pass: `deploy-api` needs the `e2e` job as well as
 the other checks ([testing](testing.md)). After the web deploy, `deploy-web` runs `smoke-live.sh`,
@@ -296,6 +308,10 @@ waking API and costs a few dozen Netlify function invocations per deploy.
 Actions → CI → Run workflow on `main` with deploy checked. The web is built in CI and `API_URL`
 is baked into the rewrite there, so a changed Netlify variable reaches production only this way. A
 redeploy of the live commit passes the version wait at once; `smoke-live.sh` checks it.
+
+Deploys start from `main` only. A manual run of another branch with deploy checked fails at
+`deploy-api`, which the `production` environment refuses; with deploy off, a run of any branch
+runs the checks and publishes its image, and deploys nothing.
 
 Change Render variables with **Save only**, then run the workflow as above. Render's "Save and
 deploy" would deploy whatever `latest` points at, and `latest` moves on every `main` push before
@@ -330,11 +346,12 @@ deleted. Done once, from Frankfurt to Ohio on 2026-10-18 (ADR 0015), in this ord
 3. Render: delete the old Key Value, then create the new one as in [step 3](#3-render-key-value).
    A workspace may have one free Key Value, so it goes first; until step 6 the old API serves
    without reminders and its readiness fails.
-4. Render: create the new web service as in [step 7](#7-render-web-service) from the image tag
+4. Render: create the new web service as in [step 6](#6-render-web-service) from the image tag
    `sha-<commit>` that the live `/health/live` reports, not `latest`, which a branch run can move.
    Copy `JWT_PRIVATE_KEY` from the old service, so Netlify's public key stays. Its first start
    migrates the empty database; `/health/ready` answers 200.
-5. GitHub: `RENDER_DEPLOY_HOOK_URL` and `API_PUBLIC_URL` to the new service. Netlify: `API_URL`.
+5. GitHub: `RENDER_DEPLOY_HOOK_URL` in the `production` environment and the `API_PUBLIC_URL`
+   variable to the new service. Netlify: `API_URL`.
 6. A manual run on `main` (see [Redeploy](#redeploy-or-ship-a-changed-variable)) deploys to the new
    service and rebuilds the web with the new `API_URL`.
 7. UptimeRobot: the API monitor's URL. The old service sleeps 15 minutes later and stops using
@@ -347,13 +364,51 @@ Until step 9 the way back is the old hook, `API_PUBLIC_URL`, `API_URL` and monit
 Value in the old region (after deleting the new one) set on the old service with Save only, and a
 manual run. Accounts created in the new region are lost unless the data is copied.
 
+## Repository
+
+The repository is public. Decisions and their reasons are in
+[ADR 0018](adr/0018-public-repository.md).
+
+### Ruleset on `main`
+
+Settings → Rules → Rulesets, one active ruleset, `main`:
+
+| Rule                 | Setting                                                                     |
+| -------------------- | --------------------------------------------------------------------------- |
+| Target               | the default branch                                                          |
+| Bypass               | nobody, the owner included                                                  |
+| Deletion, force push | blocked                                                                     |
+| Linear history       | required                                                                    |
+| Pull request         | required, 0 approvals, squash merges only                                   |
+| Status checks        | `lint`, `typecheck`, `test`, `e2e`, `image`, `pr-title` from GitHub Actions |
+| Branch up to date    | required                                                                    |
+
+- The checks are the job names of `ci.yml` and `pr-title.yml`. A pull request that renames a job
+  waits for a check that never reports: swap the name in the ruleset right before merging it.
+- With no bypass, a red pull request has no "merge anyway" button and nobody pushes to `main`.
+  When CI fails for a reason outside the code (an outage of GitHub or a host), the owner, as the
+  repository's admin, sets the ruleset to Disabled for that merge and back to Active right after.
+- A pull request opened before another one merged is behind `main`: Update branch takes `main` in
+  and runs the checks again before it can merge.
+
+Settings → General → Pull Requests: squash merging only, its commit title from the pull request's
+title (commitlint checks it in `pr-title`); head branches are deleted after the merge.
+
+### Public settings
+
+- Security: secret scanning and push protection on, free for public repositories.
+- Actions → General: workflow runs from every outside contributor wait for approval. A pull
+  request from a fork never gets the `production` secrets either way.
+- About: description, website `https://clientry.netlify.app`, topics. The social preview is
+  `docs/media/social-preview.png`, uploaded in Settings → General → Social preview; upload it again
+  after `pnpm media` changes it.
+
 ## Expiry and rotation
 
 | Credential               | Where it lives                     | Expires    | Rotation                                                                                            |
 | ------------------------ | ---------------------------------- | ---------- | --------------------------------------------------------------------------------------------------- |
-| `NETLIFY_AUTH_TOKEN`     | GitHub secret                      | 2027-10-08 | new personal access token in Netlify, update the secret, delete the old token                       |
-| GHCR classic token       | Render registry credential         | 2027-10-08 | new `read:packages` token, update the credential, delete the old token                              |
-| `RENDER_DEPLOY_HOOK_URL` | GitHub secret                      | never      | regenerate in Render when it may have leaked, update the secret                                     |
+| `NETLIFY_AUTH_TOKEN`     | GitHub, `production` secret        | 2027-10-24 | new personal access token in Netlify, update the secret, delete the old token                       |
+| `RENDER_DEPLOY_HOOK_URL` | GitHub, `production` secret        | never      | regenerate in Render when it may have leaked, update the secret                                     |
 | JWT key pair             | Render (private), Netlify (public) | never      | new `jwt:keygen`, Render with Save only, Netlify, then a manual run; every user signs in again once |
 | Neon role password       | inside `DATABASE_URL`              | never      | reset in Neon, `DATABASE_URL` on Render with Save only, then a manual run                           |
 
@@ -368,7 +423,8 @@ check again before relying on a number.
 | api      | Render web service Free, Ohio | 512 MB, 0.1 CPU; sleeps after 15 min without traffic, about 1 min to wake; 750 h per month per workspace, and using them all suspends every free web service until the next month                                                     |
 | Valkey   | Render Key Value Free, Ohio   | 25 MB, 50 connections, no persistence, internal URL only; one free instance per workspace                                                                                                                                             |
 | Postgres | Neon Free, AWS us-east-2      | per project 1 GB storage and 100 CU-hours per month; compute fixed at 0.25 CU, scales to zero after 5 min (cannot be disabled on Free); Free projects inactive for 90 days may be deleted, and the hourly sweep keeps this one active |
-| images   | GHCR, private package         | storage and transfer currently free                                                                                                                                                                                                   |
+| images   | GHCR, public package          | storage and transfer free for public packages                                                                                                                                                                                         |
+| CI       | GitHub Actions                | standard runners free without a monthly minute limit on a public repository; a private one on the Free plan gets 2 000 minutes                                                                                                        |
 | pinger   | UptimeRobot Free              | 5-minute interval, non-commercial use                                                                                                                                                                                                 |
 
 Going over Netlify's legacy limits applies a paid add-on, which an account without a card cannot

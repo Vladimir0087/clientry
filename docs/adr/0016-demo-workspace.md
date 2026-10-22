@@ -5,7 +5,7 @@ Date: 2026-10-18
 
 ## Context
 
-A recruiter or a client opens the live link and will not sign up, so the link only works if one
+A visitor opens the live link and will not sign up, so the link only works if one
 press shows a product already in use. The plan names one demo account with a filled pipeline,
 rebuilt daily. That account is public: whatever its owner may do, any visitor may, including the
 team actions that let one person take a workspace over (ADR 0013). The demo also has to read as
