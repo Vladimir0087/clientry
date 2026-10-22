@@ -407,7 +407,7 @@ title (commitlint checks it in `pr-title`); head branches are deleted after the 
 
 | Credential               | Where it lives                     | Expires    | Rotation                                                                                            |
 | ------------------------ | ---------------------------------- | ---------- | --------------------------------------------------------------------------------------------------- |
-| `NETLIFY_AUTH_TOKEN`     | GitHub, `production` secret        | 2027-10-08 | new personal access token in Netlify, update the secret, delete the old token                       |
+| `NETLIFY_AUTH_TOKEN`     | GitHub, `production` secret        | 2027-10-24 | new personal access token in Netlify, update the secret, delete the old token                       |
 | `RENDER_DEPLOY_HOOK_URL` | GitHub, `production` secret        | never      | regenerate in Render when it may have leaked, update the secret                                     |
 | JWT key pair             | Render (private), Netlify (public) | never      | new `jwt:keygen`, Render with Save only, Netlify, then a manual run; every user signs in again once |
 | Neon role password       | inside `DATABASE_URL`              | never      | reset in Neon, `DATABASE_URL` on Render with Save only, then a manual run                           |
