@@ -11,7 +11,7 @@ export default defineConfig(
     },
   },
   {
-    files: ['tests/**/*.ts', 'live/**/*.ts'],
+    files: ['tests/**/*.ts', 'live/**/*.ts', 'media/**/*.ts'],
     extends: [playwright.configs['flat/recommended']],
     rules: {
       // A test often requests a fixture only for its setup, such as a signed-in owner.

@@ -23,6 +23,7 @@ Three levels, all in CI on every pull request. The end-to-end decisions are in
 | `pnpm --filter @clientry/e2e e2e --headed`                                  | runs in a visible browser window                                         |
 | `pnpm --filter @clientry/e2e exec playwright show-trace <trace.zip>`        | opens a failed test's trace                                              |
 | `pnpm --filter @clientry/e2e e2e:live`                                      | the read-only tour of the live demo; needs `WEB_PUBLIC_URL`              |
+| `pnpm media`                                                                | builds the API and the web, then writes the README's media; see below    |
 
 `pnpm test` never runs the e2e suite. The filtered `e2e` commands do not build: after a change to
 the API or the web, run `pnpm e2e` once or build that app first.
@@ -85,6 +86,36 @@ Global setup starts everything before the first test and stops it after the last
 - Accessibility: `@axe-core/playwright` with the WCAG 2.1 A and AA rules, in the light and the dark
   theme; serious and critical violations fail. A known violation waits for its fix in `support/axe.ts`
   with its reason, excused for its one element only, so the rule still checks the rest.
+
+## README media
+
+`pnpm media` starts the e2e stack, drives the demo in Chromium and writes `docs/media/`, replacing
+the files there. Run it by hand after a change to the interface and commit the files with the
+change; neither CI nor `pnpm e2e` runs it. It needs what `pnpm e2e` needs: Docker, the browser and
+free ports 3000 and 4000.
+
+| File                 | What                                                                   | Theme | Viewport                   |
+| -------------------- | ---------------------------------------------------------------------- | ----- | -------------------------- |
+| `demo.gif`           | the tour: demo login, dashboard, a deal dragged, its history, the bell | light | 1280×800, encoded 960 wide |
+| `dashboard.png`      | the owner's dashboard                                                  | light | 1280×800                   |
+| `board.png`          | the deal board                                                         | dark  | 1280×800                   |
+| `client.png`         | a client's card with its deals and tasks                               | light | 1280×800                   |
+| `tasks.png`          | the task list with overdue and due-today tasks                         | dark  | 1280×800                   |
+| `phone.png`          | the board on a phone, swiped one column on                             | light | 390×844 at device scale 2  |
+| `social-preview.png` | the dashboard's top, for GitHub's link previews                        | light | 1280×640                   |
+
+- The stack builds the same demo studio as the live site, on a fresh database each run. Its dates
+  are relative to the run and the browser shows them in UTC, so the files change only with the
+  interface and the time of the run. The tour moves a deal, which only the local stack may see; it
+  runs after the stills.
+- Stills wait for their page's loaded content (`support/screens.ts`) and for the charts' bars, with
+  reduced motion so the charts draw at once. sharp compresses each PNG, under 400 KB.
+- The tour records Playwright's screencast frames with their real timing (`support/recorder.ts`)
+  and draws a pointer into the page that follows the mouse (`support/pointer.ts`), since headless
+  frames show none. sharp scales the frames to 960 wide and joins them into a looping GIF under
+  5 MB; no ffmpeg is involved.
+- A test fails when its file goes over its budget. The social preview is uploaded by hand: GitHub →
+  Settings → General → Social preview.
 
 ## Reading a CI failure
 

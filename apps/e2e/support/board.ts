@@ -46,7 +46,9 @@ export async function arrangeDeal(
   });
 }
 
-async function centerOf(locator: Locator): Promise<{ readonly x: number; readonly y: number }> {
+export async function centerOf(
+  locator: Locator,
+): Promise<{ readonly x: number; readonly y: number }> {
   const box = await locator.boundingBox();
   if (box === null) {
     throw new BoardError(`${locator.toString()} is not on screen`);
