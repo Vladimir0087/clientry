@@ -5,8 +5,8 @@ Date: 2026-10-11
 
 ## Context
 
-ADR 0008 put the web on Vercel Hobby. Vercel declined the owner's account at sign-up, after an
-appeal too. The web still needs a free host that runs a Next 16 server: pages rendered per request,
+ADR 0008 put the web on Vercel Hobby. Vercel declined the account at sign-up. The web still needs
+a free host that runs a Next 16 server: pages rendered per request,
 `proxy.ts` setting a nonce CSP on every response, and the `/api/*` rewrite that keeps the refresh
 cookie first-party. As with Render, the host must not get access to the private repository, and
 only a green CI run may deploy.

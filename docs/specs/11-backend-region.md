@@ -87,8 +87,8 @@ local one is 17) would need the old API stopped first, so that no write lands af
 
 **The move, in order**
 
-The owner works the panels; Claude prepares values and commands, measures and runs
-`browser-verify`.
+The owner works the panels; the values and commands are prepared beforehand, and each step is
+measured and checked in a browser.
 
 1. Before anything changes:
    - the baseline latency, as in section 6;

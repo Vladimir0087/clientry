@@ -51,7 +51,7 @@ Filled in at setup. Names may carry a suffix where the plain one is taken.
 
 ## Consoles
 
-All accounts are the owner's personal ones (personal email, not a work address).
+All accounts are the owner's.
 
 | Service                      | Console                                                                       |
 | ---------------------------- | ----------------------------------------------------------------------------- |

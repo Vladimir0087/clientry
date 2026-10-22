@@ -23,7 +23,7 @@ What it would give:
   compete for both.
 - Valkey with persistence instead of 25 MB without it.
 - Independence from Render's free-plan terms.
-- Infrastructure work in the portfolio: a server, Compose, Caddy, a deploy over SSH.
+- Infrastructure of its own: a server, Compose, Caddy, a deploy over SSH.
 
 What it costs:
 
@@ -44,7 +44,7 @@ Any one of:
 - after spec 08, the API with the BullMQ worker does not fit Render's 512 MB (out-of-memory
   restarts in the Render log);
 - Render changes its free-plan terms (sleep, hours, limits);
-- the owner wants the infrastructure part in the portfolio.
+- the project needs infrastructure of its own.
 
 ### In scope, if revived
 

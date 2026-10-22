@@ -40,7 +40,7 @@ docs/adr/0018-public-repository.md
 **README**
 
 Written for a visitor who reads the first screen only: by its end they know what the product is
-and have the demo link. It presents Clientry as a product, without calling it a portfolio project.
+and have the demo link. It presents Clientry as a product.
 It says only what the repository already shows, and no counts that go stale (tests, endpoints,
 lines).
 
