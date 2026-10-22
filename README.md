@@ -61,18 +61,21 @@ It works on a phone, in a light and a dark theme.
 
 ```mermaid
 flowchart LR
-  browser[Browser] --> netlify["Netlify (web: edge near the visitor, functions in Ohio)"]
-  netlify -- "/api/* rewrite" --> render["Render web service (api + worker, Ohio)"]
-  render --> neon[("Neon Postgres (us-east-2)")]
-  render --> valkey[("Render Key Value (Ohio)")]
-  pinger[UptimeRobot] -- "/health/live" --> render
-  ci[GitHub Actions] -- "image digest via deploy hook" --> render
-  ci -- "netlify deploy" --> netlify
-  ci -- "push" --> ghcr[(GHCR)]
-  render -- "pull" --> ghcr
-  shared["packages/shared (zod schemas and types)"] -.->|one contract| netlify
-  shared -.->|one contract| render
+  browser[Browser] -->|"pages and /api/*"| web["Web on Netlify<br>edge near the visitor, functions in Ohio"]
+  web -->|"/api/* rewrite"| api["API and worker on Render<br>Ohio"]
+  api -->|"SQL"| neon[("Postgres on Neon<br>us-east-2")]
+  api -->|"queues and timers"| valkey[("Valkey on Render Key Value<br>Ohio")]
+  pinger[UptimeRobot] -->|"/health/live every 5 min"| api
+  ci[GitHub Actions] ==>|"tested image"| ghcr[(GHCR)]
+  ghcr ==>|"image by digest"| api
+  ci ==>|"deploy hook with the digest"| api
+  ci ==>|"build and deploy"| web
+  shared["packages/shared<br>zod schemas and types"] -.->|"one contract"| web
+  shared -.->|"one contract"| api
 ```
+
+Thin arrows are requests at runtime, thick ones are deploys from CI, dotted ones are code that both
+apps build from.
 
 - **The API is a modular monolith**: a NestJS module per domain, each layered controller → service
   → repository, with Prisma reachable only from repositories.

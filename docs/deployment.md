@@ -10,16 +10,18 @@ Netlify in [ADR 0011](adr/0011-web-on-netlify.md), for the region in
 
 ```mermaid
 flowchart LR
-  browser[Browser] --> netlify["Netlify (web: edge near the visitor, functions in Ohio)"]
-  netlify -- "/api/* rewrite" --> render["Render web service (api, Ohio)"]
-  render --> neon[("Neon Postgres (us-east-2)")]
-  render --> valkey[("Render Key Value (Ohio)")]
-  pinger[UptimeRobot] -- "/health/live" --> render
-  ci[GitHub Actions] -- "image digest via deploy hook" --> render
-  ci -- "netlify deploy" --> netlify
-  ci -- "push" --> ghcr[(GHCR)]
-  render -- "pull" --> ghcr
+  browser[Browser] -->|"pages and /api/*"| web["Web on Netlify<br>edge near the visitor, functions in Ohio"]
+  web -->|"/api/* rewrite"| api["API and worker on Render<br>Ohio"]
+  api -->|"SQL"| neon[("Postgres on Neon<br>us-east-2")]
+  api -->|"queues and timers"| valkey[("Valkey on Render Key Value<br>Ohio")]
+  pinger[UptimeRobot] -->|"/health/live every 5 min"| api
+  ci[GitHub Actions] ==>|"tested image"| ghcr[(GHCR)]
+  ghcr ==>|"image by digest"| api
+  ci ==>|"deploy hook with the digest"| api
+  ci ==>|"build and deploy"| web
 ```
+
+Thin arrows are requests at runtime, thick ones are deploys from CI.
 
 - The browser talks to the Netlify origin only; Next rewrites `/api/*` to the API.
 - Netlify's server function, the API, Valkey and Postgres share one region, Ohio: the function's
