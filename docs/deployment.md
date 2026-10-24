@@ -186,7 +186,8 @@ The site's origin `https://clientry.netlify.app` is the web origin from now on.
 
 New → Web Service → Existing image:
 
-- image `ghcr.io/vladimir0087/clientry-api:latest`, no credential: the package is public (step 4);
+- image `ghcr.io/vladimir0087/clientry-api:sha-<commit>`, the tag step 4 published, never `latest`
+  (see [Redeploy](#redeploy-or-ship-a-changed-variable)); no credential: the package is public;
 - region Ohio, instance type Free, no disk;
 - health check path `/health/live`, **not** `/health/ready`: Render probes it continuously, and a
   probe that queries Postgres would keep Neon awake and spend its compute budget in under three
@@ -313,10 +314,13 @@ Deploys start from `main` only. A manual run of another branch with deploy check
 `deploy-api`, which the `production` environment refuses; with deploy off, a run of any branch
 runs the checks and publishes its image, and deploys nothing.
 
-Change Render variables with **Save only**, then run the workflow as above. Render's "Save and
-deploy" would deploy whatever `latest` points at, and `latest` moves on every `main` push before
-the tests finish and on every manual run of any branch, so it can be an untested or a branch
-image. The manual run deploys the tested digest instead.
+Change Render variables with **Save only**, then run the workflow as above. CI deploys by digest
+and leaves the service's source image alone, so Render's "Save and deploy" deploys that pinned
+`sha-<commit>` tag, which can be older than the live version. The source image is never `latest`:
+it moves on every `main` push before the tests finish and on every manual run of any branch, so it
+can be an untested or a branch image. To repoint the source image, Settings → Image → Update
+Source with the tag of the version `/health/live` reports; it is the live version, so even a deploy
+of it changes nothing.
 
 ### Manual smoke check
 

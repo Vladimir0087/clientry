@@ -4,6 +4,8 @@ export const TRUSTED_ORIGIN = 'http://localhost:3000';
 // The same images as compose.yaml.
 export const POSTGRES_IMAGE = 'postgres:18';
 export const VALKEY_IMAGE = 'valkey/valkey:8.1';
+// UTC−10 all year, without daylight saving.
+export const SERVER_TIME_ZONE = 'Pacific/Honolulu';
 export const TEST_APP_VERSION = 'integration-test';
 
 // A fresh key per call, so no signing key is ever committed, not even a test one.

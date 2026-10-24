@@ -8,6 +8,10 @@ interface StatementTimeout {
   readonly statement_timeout: string;
 }
 
+interface SessionTimeZone {
+  readonly TimeZone: string;
+}
+
 describe('PrismaService', () => {
   let testApp: TestApp;
 
@@ -25,5 +29,13 @@ describe('PrismaService', () => {
     const [row] = await prisma.$queryRaw<StatementTimeout[]>`SHOW statement_timeout`;
 
     expect(row?.statement_timeout).toBe('10s');
+  });
+
+  it('should open connections in UTC when the server defaults to another zone', async () => {
+    const prisma = testApp.app.get(PrismaService);
+
+    const [row] = await prisma.$queryRaw<SessionTimeZone[]>`SHOW TimeZone`;
+
+    expect(row?.TimeZone).toBe('UTC');
   });
 });

@@ -8,6 +8,7 @@ import sharp from 'sharp';
 import { firstClientId } from '../support/api.js';
 import { column, dragHandle } from '../support/board.js';
 import { expect, test } from '../support/fixtures.js';
+import { pause } from '../support/pause.js';
 import { drawPointer } from '../support/pointer.js';
 import { startRecording } from '../support/recorder.js';
 import { BOARD, CLIENT, DASHBOARD, LOGIN, openScreen, TASK_LIST } from '../support/screens.js';
@@ -37,11 +38,6 @@ async function saveStill(page: Page, name: string): Promise<number> {
     .png({ palette: true, compressionLevel: 9, effort: 10 })
     .toBuffer();
   return save(name, png);
-}
-
-// The viewer's time to look; the frames keep their real timing.
-function hold(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // The charts are hidden from assistive technology, so their bars are found by recharts' class.
@@ -142,33 +138,34 @@ test.describe('readme tour', () => {
     const pointer = await drawPointer(page, { x: 1000, y: 600 });
     await openScreen(page, LOGIN);
     const recording = await startRecording(page);
-    await hold(600);
+    // Each pause is the viewer's time to look; the frames keep their real timing.
+    await pause(600);
 
     await pointer.click(LOGIN.ready(page));
     await expectDashboardDrawn(page);
-    await hold(1600);
+    await pause(1600);
 
     await pointer.click(
       page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Deals' }),
     );
     const handle = await dragHandle(page, DRAGGED_DEAL);
-    await hold(700);
+    await pause(700);
     const moved = page.waitForResponse((response) => response.url().endsWith('/move'));
     await pointer.drag(handle, column(page, 'Proposal sent').getByRole('listitem').first());
     expect((await moved).status()).toBe(200);
-    await hold(500);
+    await pause(500);
 
     await pointer.click(column(page, 'Proposal sent').getByRole('link', { name: DRAGGED_DEAL }));
     const history = page.getByRole('region', { name: 'History' });
     await expect(history).toContainText('Ann Carter moved the deal from Call to Proposal sent');
     await pointer.moveTo(history.getByRole('listitem').first());
-    await hold(1200);
+    await pause(1200);
 
     await pointer.click(page.getByRole('button', { name: /^Notifications, \d+ unread$/ }));
     await expect(
       page.getByRole('dialog', { name: 'Notifications' }).getByRole('link').first(),
     ).toBeVisible();
-    await hold(1800);
+    await pause(1800);
 
     expect(await save('demo.gif', await recording.toGif(GIF_WIDTH))).toBeLessThan(GIF_BUDGET);
   });

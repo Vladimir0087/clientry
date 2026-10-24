@@ -15,6 +15,12 @@ describe('createPoolOptions', () => {
     });
   });
 
+  it('should start every session in UTC when built', () => {
+    const options = createPoolOptions(createUnitConfig());
+
+    expect(options.options).toBe('-c TimeZone=UTC');
+  });
+
   it('should take the connection string from the config when built', () => {
     const databaseUrl = 'postgresql://clientry:clientry@db.example:5432/clientry';
 

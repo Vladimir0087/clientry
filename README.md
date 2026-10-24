@@ -208,6 +208,8 @@ one pull request with the spec inside. The specs and their index are in [docs/sp
 
 ## Roadmap
 
+What each release brought is in the [changelog](CHANGELOG.md). Next:
+
 - A realtime board and notification bell over WebSocket.
 - Custom fields on clients and deals.
 - Email notifications.

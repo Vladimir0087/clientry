@@ -19,17 +19,6 @@ import type { SessionResponse } from '@clientry/shared/auth';
 
 import { useLogout } from '../model/use-logout';
 
-const MAX_INITIALS = 2;
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter((word) => word !== '')
-    .slice(0, MAX_INITIALS)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join('');
-}
-
 interface AccountSummaryProps {
   readonly session: SessionResponse;
 }
@@ -63,12 +52,9 @@ export function UserMenu(): React.JSX.Element {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
+        {/* An icon, not initials: visible text would have to be part of the name "Account". */}
         <Button variant="outline" size="icon" aria-label="Account" className="rounded-full">
-          {data === undefined ? (
-            <UserIcon aria-hidden="true" />
-          ) : (
-            <span aria-hidden="true">{initials(data.user.name)}</span>
-          )}
+          <UserIcon aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

@@ -45,5 +45,6 @@ shapes the stages.
 | [13 End-to-end tests and full CI](13-e2e-ci.md) | Playwright scenarios, axe, deploys gated on e2e, the live tour    | Shipped  |
 | [14 Launch](14-launch.md)                       | the public repository, README and media, the ruleset on `main`    | Shipped  |
 | [15 Deploy, stage 2](15-deploy-stage-2.md)      | the API on a free virtual machine of its own                      | Deferred |
+| [16 Finishing v1](16-v1-finish.md)              | deferred fixes, docs that match the live setup, release 1.0.0     | Shipped  |
 
 Spec 15 is optional: the demo runs well on stage 1, and the spec lists when it would be picked up.
