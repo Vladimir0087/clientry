@@ -1,11 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 
-import { centerOf } from './board.js';
-
-interface Point {
-  readonly x: number;
-  readonly y: number;
-}
+import { centerOf } from './geometry.js';
+import type { Point } from './geometry.js';
+import { pause } from './pause.js';
 
 // About one move per frame at 60 Hz, so the drawn pointer glides rather than jumps.
 const STEP_MS = 16;
@@ -70,10 +67,6 @@ function installPointer(): void {
       place(x, y);
     }
   });
-}
-
-function pause(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Eases in and out, as a hand starts and stops.

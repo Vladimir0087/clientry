@@ -7,6 +7,7 @@ export interface PoolOptions {
   readonly statement_timeout: number;
   readonly query_timeout: number;
   readonly idleTimeoutMillis: number;
+  readonly options: string;
 }
 
 // pg waits forever by default: connects to a host that drops packets would pile up in the pool.
@@ -17,6 +18,9 @@ const STATEMENT_TIMEOUT_MS = 10_000;
 const QUERY_TIMEOUT_MS = 15_000;
 // Idle connections close soon after the last request, so an idle API lets Neon scale to zero.
 const IDLE_TIMEOUT_MS = 10_000;
+// adapter-pg writes and reads timestamps as UTC wall time without an offset; Postgres applies the
+// session's zone to both. An `options` in DATABASE_URL would replace this one.
+const SESSION_OPTIONS = '-c TimeZone=UTC';
 
 export function createPoolOptions(config: AppConfig): PoolOptions {
   return {
@@ -25,5 +29,6 @@ export function createPoolOptions(config: AppConfig): PoolOptions {
     statement_timeout: STATEMENT_TIMEOUT_MS,
     query_timeout: QUERY_TIMEOUT_MS,
     idleTimeoutMillis: IDLE_TIMEOUT_MS,
+    options: SESSION_OPTIONS,
   };
 }

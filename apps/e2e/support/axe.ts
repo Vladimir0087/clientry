@@ -11,10 +11,7 @@ interface KnownViolation {
 }
 
 // One rule on one element each, so the rule still checks the rest; each fix is its own pull request.
-const KNOWN_VIOLATIONS: readonly KnownViolation[] = [
-  // The account button shows the user's initials but is named "Account"; its look needs a design call.
-  { rule: 'label-content-name-mismatch', element: 'aria-label="Account"' },
-];
+const KNOWN_VIOLATIONS: readonly KnownViolation[] = [];
 
 function isKnown(rule: string, html: string): boolean {
   return KNOWN_VIOLATIONS.some((known) => known.rule === rule && html.includes(known.element));

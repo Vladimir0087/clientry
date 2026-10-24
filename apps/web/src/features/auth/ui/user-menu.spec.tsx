@@ -24,6 +24,15 @@ async function openMenu(): Promise<void> {
 }
 
 describe('UserMenu', () => {
+  it('should show an icon instead of the initials when signed in', async () => {
+    renderSignedIn();
+
+    const button = await screen.findByRole('button', { name: 'Account' });
+
+    expect(button.textContent).toBe('');
+    expect(button.querySelector('svg')).not.toBeNull();
+  });
+
   it('should show the name, email and role when opened', async () => {
     renderSignedIn();
 

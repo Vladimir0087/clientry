@@ -3,10 +3,10 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseEnv } from 'node:util';
 
-const ROOT = fileURLToPath(new URL('../', import.meta.url));
-const ENV_FILE = fileURLToPath(new URL('../.env', import.meta.url));
-const ENV_EXAMPLE = fileURLToPath(new URL('../.env.example', import.meta.url));
-const KEYGEN = fileURLToPath(new URL('../apps/api/scripts/generate-jwt-keys.ts', import.meta.url));
+const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const ENV_FILE = fileURLToPath(new URL('../../../.env', import.meta.url));
+const ENV_EXAMPLE = fileURLToPath(new URL('../../../.env.example', import.meta.url));
+const KEYGEN = fileURLToPath(new URL('generate-jwt-keys.ts', import.meta.url));
 const KEYGEN_COMMAND = 'pnpm --silent --filter @clientry/api jwt:keygen';
 const KEY_NAMES = ['JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY'] as const;
 

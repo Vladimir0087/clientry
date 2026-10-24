@@ -6,7 +6,12 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { ValkeyContainer } from '@testcontainers/valkey';
 import type { TestProject } from 'vitest/node';
 
-import { generateSigningKeyPem, POSTGRES_IMAGE, VALKEY_IMAGE } from './support/test-env.js';
+import {
+  generateSigningKeyPem,
+  POSTGRES_IMAGE,
+  SERVER_TIME_ZONE,
+  VALKEY_IMAGE,
+} from './support/test-env.js';
 
 declare module 'vitest' {
   export interface ProvidedContext {
@@ -31,8 +36,10 @@ async function prisma(args: readonly string[], databaseUrl: string): Promise<voi
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const [postgres, valkey] = await Promise.all([
     // Neon's locale: byte order, so only an explicit collation sorts names and tags by language.
+    // A zone behind UTC: a connection without the pool's TimeZone would shift every stored moment.
     new PostgreSqlContainer(POSTGRES_IMAGE)
       .withEnvironment({ POSTGRES_INITDB_ARGS: '--locale=C.UTF-8' })
+      .withCommand(['postgres', '-c', `timezone=${SERVER_TIME_ZONE}`])
       .start(),
     new ValkeyContainer(VALKEY_IMAGE).start(),
   ]);

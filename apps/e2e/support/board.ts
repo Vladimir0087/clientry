@@ -5,10 +5,7 @@ import type { SessionResponse } from '@clientry/shared/auth';
 import type { Deal } from '@clientry/shared/deals';
 
 import { createClient, createDeal, findStage } from './api.js';
-
-class BoardError extends Error {
-  override readonly name = 'BoardError';
-}
+import { centerOf } from './geometry.js';
 
 // dnd-kit mounts its instructions only in the browser, so a described handle means a hydrated board.
 export async function dragHandle(page: Page, title: string): Promise<Locator> {
@@ -44,16 +41,6 @@ export async function arrangeDeal(
     currency: 'USD',
     assigneeId: owner.user.id,
   });
-}
-
-export async function centerOf(
-  locator: Locator,
-): Promise<{ readonly x: number; readonly y: number }> {
-  const box = await locator.boundingBox();
-  if (box === null) {
-    throw new BoardError(`${locator.toString()} is not on screen`);
-  }
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
 // Small steps, as a hand moves: the pointer sensor starts a drag only after 4 px.

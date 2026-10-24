@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "turbo run dev",
-    "dev:setup": "node scripts/dev-setup.ts",
+    "dev:setup": "node apps/api/scripts/dev-setup.ts",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

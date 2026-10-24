@@ -94,4 +94,6 @@ export const TEAM: Screen = {
 export async function openScreen(page: Page, screen: Screen): Promise<void> {
   await page.goto(await screen.path(page));
   await expect(screen.ready(page)).toBeVisible();
+  // Dates are written into their <time> only after hydration, so an empty one is a page still loading.
+  await expect(page.locator('time:empty')).toHaveCount(0);
 }
