@@ -4,6 +4,19 @@ Notable changes to Clientry. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-11-24
+
+### Security
+
+- **Web**: Next.js 16.4.6 closes the advisories that affect 16.3.8, among them two unauthenticated
+  remote code executions (the image optimization API and `use cache`) and an HttpOnly cookie
+  exposure.
+
+### Fixed
+
+- **Web**: the Netlify adapter 5.16.8 ships the per-page Turbopack manifests with the server
+  function, so the chunks of dynamically imported components load before hydration on Netlify.
+
 ## [1.0.0] - 2026-10-24
 
 The first release: a lightweight CRM for a small team, live at
@@ -42,4 +55,5 @@ The first release: a lightweight CRM for a small team, live at
   [spec 11](docs/specs/11-backend-region.md), [spec 13](docs/specs/13-e2e-ci.md),
   [spec 14](docs/specs/14-launch.md)).
 
+[1.0.1]: https://github.com/Vladimir0087/clientry/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Vladimir0087/clientry/releases/tag/v1.0.0
